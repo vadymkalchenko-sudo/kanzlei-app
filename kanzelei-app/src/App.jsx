@@ -132,7 +132,6 @@ export const App = () => {
           )}
         </Modal>
       </div>
-      <script src="https://cdn.tailwindcss.com"></script>
     </div>
   );
 };

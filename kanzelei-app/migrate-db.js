@@ -1,12 +1,13 @@
+require('dotenv').config();
 const { Pool } = require('pg');
 
 // Konfiguriere die Verbindung zur CLOUD-Datenbank
 const pool = new Pool({
-  user: 'postgres',
-  host: '34.141.107.98',
-  database: 'kanzlei',
-  password: 'Techniker0!', // <--- HIER IHR PASSWORT EINTRAGEN
-  port: 5432,
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_DATABASE,
+  password: process.env.DB_PASSWORD,
+  port: process.env.DB_PORT,
 });
 
 async function runMigration() {
@@ -30,12 +31,11 @@ async function runMigration() {
     // 2. Daten einfügen
     const insertDataQuery = `
       INSERT INTO kanzlei_daten (mandant_name, fall_status)
-      VALUES
-      ('Max Mustermann', 'aktiv'),
-      ('Erika Mustermann', 'in Bearbeitung')
+      VALUES ($1, $2), ($3, $4)
       ON CONFLICT (id) DO NOTHING;
     `;
-    await client.query(insertDataQuery);
+    const values = ['Max Mustermann', 'aktiv', 'Erika Mustermann', 'in Bearbeitung'];
+    await client.query(insertDataQuery, values);
     console.log('Daten erfolgreich eingefügt.');
 
     // Transaktion abschließen
