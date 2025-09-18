@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useKanzleiLogic } from './hooks/useKanzleiLogic.js';
 import { MandantenList } from './components/MandantenList.jsx';
 import MandantenForm from './components/MandantenForm.jsx';
@@ -18,11 +18,14 @@ export const App = () => {
     handleDeleteMandant,
     handleRecordSubmit,
     handleDeleteRecord,
+    handleExport,
+    handleImport,
   } = useKanzleiLogic();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState(null); // 'mandant' oder 'akte'
   const [selectedItem, setSelectedItem] = useState(null); // Für Bearbeitung
+  const importInputRef = useRef(null);
 
   // Schließt die Meldungsanzeige
   const handleCloseMessage = () => {
@@ -46,12 +49,37 @@ export const App = () => {
     setModalType(null);
     setSelectedItem(null);
   };
+
+  const onImportClick = () => {
+    importInputRef.current.click();
+  };
+
+  const onFileImport = (e) => {
+    const file = e.target.files[0];
+    handleImport(file);
+    e.target.value = null; // Reset input
+  };
   
   return (
     <div className="bg-gray-100 min-h-screen p-8 font-sans antialiased text-gray-800">
       <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-8">
-        <header className="mb-8">
+        <header className="flex justify-between items-start mb-8">
           <h1 className="text-4xl md:text-5xl font-extrabold text-gray-800">Kanzlei-Verwaltung</h1>
+          <div className="flex space-x-2">
+            <button onClick={handleExport} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors">
+              Export
+            </button>
+            <button onClick={onImportClick} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors">
+              Import
+            </button>
+            <input
+              type="file"
+              ref={importInputRef}
+              onChange={onFileImport}
+              className="hidden"
+              accept="application/json"
+            />
+          </div>
         </header>
 
         {/* Meldungsanzeige */}

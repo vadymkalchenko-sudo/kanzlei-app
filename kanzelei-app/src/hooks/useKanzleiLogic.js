@@ -1,113 +1,185 @@
-import { useState, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid';
+import { useState, useEffect, useCallback } from 'react';
+import * as api from '../api';
 
-// Generiert eine eindeutige ID für den lokalen Benutzer
-const getLocalUserId = () => {
-  let userId = localStorage.getItem('kanzlei_user_id');
-  if (!userId) {
-    userId = uuidv4();
-    localStorage.setItem('kanzlei_user_id', userId);
-  }
-  return userId;
-};
-
-// Generiert eine neue Aktennummer im Format YY-NNNN
-const generateNewCaseNumber = (records) => {
-  const currentYear = new Date().getFullYear().toString().substring(2);
-  const recordsInCurrentYear = records.filter(record => record.caseNumber && record.caseNumber.startsWith(currentYear));
-
-  let maxNumber = 0;
-  if (recordsInCurrentYear.length > 0) {
-    const numbers = recordsInCurrentYear.map(record => parseInt(record.caseNumber.split('-')[1], 10) || 0);
-    maxNumber = Math.max(...numbers);
-  }
-
-  const newNumber = (maxNumber + 1).toString().padStart(4, '0');
-  return `${currentYear}-${newNumber}`;
+// Generiert eine neue Aktennummer im Format [Laufende Nummer].[Zweistelliges Jahr].awr
+const generateNewCaseNumber = (totalRecords) => {
+  const year = new Date().getFullYear().toString().slice(-2);
+  const nextId = totalRecords + 1;
+  return `${nextId}.${year}.awr`;
 };
 
 /**
  * Ein benutzerdefinierter Hook, der die gesamte Geschäftslogik der Anwendung kapselt.
- * Er simuliert die Datenhaltung in einer lokalen Datenbank und bietet Funktionen
- * zum Verwalten von Mandanten und Akten.
+ * Er interagiert mit der API-Schicht, um Daten zu verwalten.
  */
 export const useKanzleiLogic = () => {
   const [isAppReady, setIsAppReady] = useState(false);
-  const [userId, setUserId] = useState(null);
   const [records, setRecords] = useState([]);
   const [mandanten, setMandanten] = useState([]);
   const [message, setMessage] = useState(null);
 
-  // Simuliert das Laden von Daten beim ersten Laden der App
-  useEffect(() => {
-    const currentUserId = getLocalUserId();
-    setUserId(currentUserId);
-    
-    const loadedMandanten = JSON.parse(localStorage.getItem('mandanten')) || [];
-    const loadedRecords = JSON.parse(localStorage.getItem('records')) || [];
-
-    setMandanten(loadedMandanten);
-    setRecords(loadedRecords);
-    setIsAppReady(true);
+  const fetchData = useCallback(async () => {
+    try {
+      const [mandantenData, recordsData] = await Promise.all([
+        api.getMandanten(),
+        api.getRecords(),
+      ]);
+      setMandanten(mandantenData);
+      setRecords(recordsData);
+    } catch (error) {
+      setMessage(`Fehler beim Laden der Daten: ${error.message}`);
+    } finally {
+      setIsAppReady(true);
+    }
   }, []);
 
-  // Simuliert das Speichern von Daten bei Änderungen
   useEffect(() => {
-    if (isAppReady) {
-      localStorage.setItem('mandanten', JSON.stringify(mandanten));
-      localStorage.setItem('records', JSON.stringify(records));
-    }
-  }, [mandanten, records, isAppReady]);
+    fetchData();
+  }, [fetchData]);
 
-  // Hinzufügen oder Bearbeiten eines Mandanten
-  const handleMandantSubmit = (mandantData) => {
-    let updatedMandanten;
-    if (mandantData.id) {
-      updatedMandanten = mandanten.map(m => m.id === mandantData.id ? mandantData : m);
-      setMessage('Mandant erfolgreich aktualisiert!');
-    } else {
-      const newMandant = { ...mandantData, id: uuidv4() };
-      updatedMandanten = [...mandanten, newMandant];
-      setMessage('Neuer Mandant erfolgreich angelegt!');
+  const handleMandantSubmit = async (mandantData) => {
+    try {
+      if (mandantData.id) {
+        await api.updateMandant(mandantData.id, mandantData);
+        setMessage('Mandant erfolgreich aktualisiert!');
+      } else {
+        await api.createMandant(mandantData);
+        setMessage('Neuer Mandant erfolgreich angelegt!');
+      }
+      fetchData(); // Daten neu laden
+    } catch (error) {
+      setMessage(`Fehler: ${error.message}`);
     }
-    setMandanten(updatedMandanten);
   };
 
-  // Löschen eines Mandanten
-  const handleDeleteMandant = (mandantId) => {
-    const updatedMandanten = mandanten.filter(m => m.id !== mandantId);
-    setMandanten(updatedMandanten);
-    setMessage('Mandant erfolgreich gelöscht!');
-  };
+  const handleDeleteMandant = async (mandantId) => {
+    try {
+      const openRecords = records.filter(
+        (r) => r.mandantId === mandantId && r.status === 'offen'
+      );
 
-  // Hinzufügen oder Bearbeiten einer Akte
-  const handleRecordSubmit = (recordData) => {
-    let updatedRecords;
-    if (recordData.id) {
-      updatedRecords = records.map(r => r.id === recordData.id ? recordData : r);
-      setMessage('Akte erfolgreich aktualisiert!');
-    } else {
-      const newRecord = {
-        ...recordData,
-        id: uuidv4(),
-        caseNumber: generateNewCaseNumber(records),
-      };
-      updatedRecords = [...records, newRecord];
-      setMessage('Neue Akte erfolgreich angelegt!');
+      if (openRecords.length > 0) {
+        const recordNumbers = openRecords.map((r) => r.caseNumber).join(', ');
+        setMessage(
+          `Mandant kann nicht gelöscht werden. Es gibt noch offene Akten: ${recordNumbers}`
+        );
+        return;
+      }
+
+      await api.deleteMandant(mandantId);
+      setMessage('Mandant erfolgreich gelöscht!');
+      fetchData(); // Daten neu laden
+    } catch (error) {
+      setMessage(`Fehler: ${error.message}`);
     }
-    setRecords(updatedRecords);
   };
 
-  // Löschen einer Akte
-  const handleDeleteRecord = (recordId) => {
-    const updatedRecords = records.filter(r => r.id !== recordId);
-    setRecords(updatedRecords);
-    setMessage('Akte erfolgreich gelöscht!');
+  const handleRecordSubmit = async (formData) => {
+    try {
+      const { id, isNewMandant, mandantId, name, email, street, zipCode, city, description, status } = formData;
+
+      const mandantData = { name, email, street, zipCode, city };
+      const recordCoreData = { description, status };
+
+      let finalMandantId = mandantId;
+      let mandantUpdated = false;
+
+      // Logic for handling Mandant data
+      if (isNewMandant) {
+        const newMandant = await api.createMandant(mandantData);
+        finalMandantId = newMandant.id;
+        setMessage('Neuer Mandant wurde angelegt. ');
+      } else if (mandantId) {
+        const originalMandant = mandanten.find(m => m.id === mandantId);
+        const hasChanged = Object.keys(mandantData).some(key => mandantData[key] !== originalMandant[key]);
+
+        if (hasChanged) {
+          const confirmUpdate = window.confirm(
+            "Die Mandantendaten wurden geändert. Möchten Sie den bestehenden Mandanten aktualisieren?\n\n'OK' = Aktualisieren, 'Abbrechen' = Neuen Mandant anlegen."
+          );
+
+          if (confirmUpdate) {
+            await api.updateMandant(mandantId, { ...originalMandant, ...mandantData });
+            setMessage('Mandantendaten wurden aktualisiert. ');
+          } else {
+            const newMandant = await api.createMandant(mandantData);
+            finalMandantId = newMandant.id;
+            setMessage('Ein neuer Mandant wurde mit den geänderten Daten angelegt. ');
+          }
+        }
+      }
+
+      // Logic for handling Akte data
+      if (id) { // Akte bearbeiten
+        const recordData = { ...recordCoreData, mandantId: finalMandantId };
+
+        // Aktenabschluss-Logik
+        const originalRecord = records.find(r => r.id === id);
+        if (recordData.status === 'geschlossen' && originalRecord?.status !== 'geschlossen') {
+          const clientForArchiving = mandanten.find(m => m.id === finalMandantId);
+          recordData.archivedMandantData = { ...clientForArchiving };
+           setMessage(prev => (prev || '') + 'Akte wurde geschlossen und Mandantendaten archiviert. ');
+        }
+
+        await api.updateRecord(id, recordData);
+        setMessage(prev => (prev || '') + 'Akte erfolgreich aktualisiert!');
+      } else { // Neue Akte anlegen
+        const newRecord = {
+          ...recordCoreData,
+          mandantId: finalMandantId,
+          caseNumber: generateNewCaseNumber(records.length),
+        };
+        await api.createRecord(newRecord);
+        setMessage(prev => (prev || '') + 'Neue Akte erfolgreich angelegt!');
+      }
+
+      fetchData(); // Reload all data
+    } catch (error) {
+      setMessage(`Fehler: ${error.message}`);
+    }
+  };
+
+  const handleDeleteRecord = async (recordId) => {
+    try {
+      await api.deleteRecord(recordId);
+      setMessage('Akte erfolgreich gelöscht!');
+      fetchData(); // Daten neu laden
+    } catch (error) {
+      setMessage(`Fehler: ${error.message}`);
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const data = await api.exportData();
+      const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+        JSON.stringify(data, null, 2)
+      )}`;
+      const link = document.createElement('a');
+      link.href = jsonString;
+      link.download = `kanzlei-backup-${new Date().toISOString()}.json`;
+      link.click();
+      setMessage('Daten erfolgreich exportiert.');
+    } catch (error) {
+      setMessage(`Export-Fehler: ${error.message}`);
+    }
+  };
+
+  const handleImport = async (file) => {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      await api.importData(data);
+      setMessage('Daten erfolgreich importiert. Die Ansicht wird aktualisiert.');
+      fetchData(); // Reload data
+    } catch (error) {
+      setMessage(`Import-Fehler: ${error.message}`);
+    }
   };
 
   return {
     isAppReady,
-    userId,
     records,
     mandanten,
     message,
@@ -116,6 +188,9 @@ export const useKanzleiLogic = () => {
     handleDeleteMandant,
     handleRecordSubmit,
     handleDeleteRecord,
+    fetchData,
+    handleExport,
+    handleImport,
   };
 };
 
