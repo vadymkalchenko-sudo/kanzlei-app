@@ -20,6 +20,7 @@ export const App = () => {
     handleDeleteRecord,
     handleExport,
     handleImport,
+    nextCaseNumber,
   } = useKanzleiLogic();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -63,22 +64,33 @@ export const App = () => {
   return (
     <div className="bg-gray-100 min-h-screen p-8 font-sans antialiased text-gray-800">
       <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-8">
-        <header className="flex justify-between items-start mb-8">
-          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-800">Kanzlei-Verwaltung</h1>
-          <div className="flex space-x-2">
-            <button onClick={handleExport} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors">
-              Export
-            </button>
-            <button onClick={onImportClick} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors">
-              Import
-            </button>
-            <input
-              type="file"
-              ref={importInputRef}
-              onChange={onFileImport}
-              className="hidden"
-              accept="application/json"
-            />
+        {/* Header */}
+        <header className="flex justify-between items-center mb-8 pb-4 border-b">
+          <h1 className="text-3xl font-bold text-gray-700">A-W-R Aktenverwaltung</h1>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+              </span>
+              <span className="text-sm font-medium text-gray-600">Connected</span>
+            </div>
+            <div className="flex space-x-2">
+              {/* TODO: Group these under a "Setup" dropdown */}
+              <button onClick={handleExport} className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-colors">
+                Export
+              </button>
+              <button onClick={onImportClick} className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-colors">
+                Import
+              </button>
+              <input
+                type="file"
+                ref={importInputRef}
+                onChange={onFileImport}
+                className="hidden"
+                accept="application/json"
+              />
+            </div>
           </div>
         </header>
 
@@ -94,68 +106,43 @@ export const App = () => {
           </div>
         )}
 
-        <main className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="bg-gray-50 p-6 rounded-lg shadow-inner">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-semibold text-gray-700">Mandanten</h2>
-              <button onClick={() => handleOpenMandantModal()} className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors">
-                + Neuer Mandant
-              </button>
-            </div>
-            {isAppReady ? (
-              mandanten.length > 0 ? (
-                <MandantenList
-                  mandanten={mandanten}
-                  onEdit={handleOpenMandantModal}
-                  onDelete={handleDeleteMandant}
-                />
-              ) : (
-                <p className="text-red-600">Keine Mandanten gefunden. Bitte legen Sie welche an.</p>
-              )
-            ) : (
-              <p className="text-gray-500">Lade Mandanten...</p>
-            )}
+        {/* Hauptansicht */}
+        <main>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-semibold text-gray-700">Aktenübersicht</h2>
+            <button onClick={() => handleOpenAkteModal()} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105">
+              + Neue Akte anlegen
+            </button>
           </div>
-          
-          <div className="bg-gray-50 p-6 rounded-lg shadow-inner">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-semibold text-gray-700">Akten</h2>
-              <button onClick={() => handleOpenAkteModal()} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors">
-                + Neue Akte
-              </button>
-            </div>
-            {isAppReady ? (
-              records.length > 0 ? (
-                <AktenList
-                  records={records}
-                  mandanten={mandanten}
-                  onEdit={handleOpenAkteModal}
-                  onDelete={handleDeleteRecord}
-                />
-              ) : (
-                <p className="text-red-600">Keine Akten gefunden. Bitte legen Sie welche an.</p>
-              )
+          {isAppReady ? (
+            records.length > 0 ? (
+              <AktenList
+                records={records}
+                mandanten={mandanten}
+                onEdit={handleOpenAkteModal}
+                onDelete={handleDeleteRecord} // This will be removed from AktenList itself
+              />
             ) : (
-              <p className="text-gray-500">Lade Akten...</p>
-            )}
-          </div>
+              <div className="text-center py-12 bg-gray-50 rounded-lg">
+                <p className="text-gray-500">Keine Akten gefunden.</p>
+                <p className="text-gray-400 text-sm mt-2">Klicken Sie auf "+ Neue Akte anlegen", um zu beginnen.</p>
+              </div>
+            )
+          ) : (
+            <p className="text-center text-gray-500 py-12">Lade Akten...</p>
+          )}
         </main>
         
-        {/* Modal für Mandanten und Akten */}
+        {/* Modal */}
         <Modal isOpen={isModalOpen} onClose={handleCloseModal}>
-          {modalType === 'mandant' && (
-            <MandantenForm
-              mandant={selectedItem}
-              onSubmit={handleMandantSubmit}
-              onCancel={handleCloseModal}
-            />
-          )}
+          {/* The modal now only handles 'akte' type. The 'mandant' type is removed. */}
           {modalType === 'akte' && (
             <AktenForm
               akte={selectedItem}
               mandanten={mandanten}
               onSubmit={handleRecordSubmit}
               onCancel={handleCloseModal}
+              nextCaseNumber={nextCaseNumber}
             />
           )}
         </Modal>
