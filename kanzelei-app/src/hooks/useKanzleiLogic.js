@@ -17,6 +17,19 @@ export const useKanzleiLogic = () => {
   const [records, setRecords] = useState([]);
   const [mandanten, setMandanten] = useState([]);
   const [message, setMessage] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredRecords, setFilteredRecords] = useState([]);
+
+  useEffect(() => {
+    const lowercasedFilter = searchTerm.toLowerCase();
+    const filtered = records.filter(record => {
+      const mandant = mandanten.find(m => m.id === record.mandantId);
+      const clientName = mandant ? mandant.name.toLowerCase() : '';
+      const caseNumber = record.caseNumber.toLowerCase();
+      return clientName.includes(lowercasedFilter) || caseNumber.includes(lowercasedFilter);
+    });
+    setFilteredRecords(filtered);
+  }, [searchTerm, records, mandanten]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -182,7 +195,7 @@ export const useKanzleiLogic = () => {
 
   return {
     isAppReady,
-    records,
+    records: filteredRecords, // Pass filtered records to the UI
     mandanten,
     message,
     setMessage,
@@ -194,6 +207,7 @@ export const useKanzleiLogic = () => {
     handleExport,
     handleImport,
     nextCaseNumber,
+    setSearchTerm, // Expose setter for the search term
   };
 };
 
