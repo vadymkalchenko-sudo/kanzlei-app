@@ -3,8 +3,10 @@ import { Button } from './ui/Button.jsx';
 
 const initialFormData = {
   // Akten-Daten
-  description: '',
   status: 'offen',
+  gegner: '',
+  schadenDatum: '',
+  kennzeichen: '',
   // Mandanten-Daten
   mandantId: '', // ID des bestehenden Mandanten
   name: '',
@@ -14,7 +16,7 @@ const initialFormData = {
   city: '',
 };
 
-export const AktenForm = ({ akte, mandanten, onSubmit, onCancel }) => {
+export const AktenForm = ({ akte, mandanten, onSubmit, onCancel, nextCaseNumber }) => {
   const [formData, setFormData] = useState({ ...initialFormData, ...akte });
   const [isNewMandant, setIsNewMandant] = useState(!akte?.mandantId);
 
@@ -26,8 +28,10 @@ export const AktenForm = ({ akte, mandanten, onSubmit, onCancel }) => {
         setFormData(prev => ({
           ...prev,
           ...mandant,
-          description: akte.description,
           status: akte.status,
+          gegner: akte.gegner,
+          schadenDatum: akte.schadenDatum,
+          kennzeichen: akte.kennzeichen,
         }));
       }
     }
@@ -108,21 +112,32 @@ export const AktenForm = ({ akte, mandanten, onSubmit, onCancel }) => {
 
       {/* Akten-Sektion */}
       <div className="p-4 border rounded-md bg-gray-50">
-        <h4 className="text-lg font-semibold mb-4">Akte</h4>
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="description">
-            Beschreibung
-          </label>
-          <textarea name="description" id="description" value={formData.description} onChange={handleChange} required rows="4" className="input-field w-full"></textarea>
-        </div>
-         <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="status">
-            Status
-          </label>
-          <select name="status" id="status" value={formData.status} onChange={handleChange} className="input-field w-full">
-            <option value="offen">Offen</option>
-            <option value="geschlossen">Geschlossen</option>
-          </select>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="caseNumber">
+              Aktennummer
+            </label>
+            <input
+              type="text"
+              name="caseNumber"
+              id="caseNumber"
+              value={formData.caseNumber || nextCaseNumber}
+              className="input-field bg-gray-200"
+              disabled
+            />
+          </div>
+          <input type="text" name="gegner" value={formData.gegner} onChange={handleChange} placeholder="Gegner Name" className="input-field" />
+          <input type="date" name="schadenDatum" value={formData.schadenDatum} onChange={handleChange} placeholder="Schaden-Datum" className="input-field" />
+          <input type="text" name="kennzeichen" value={formData.kennzeichen} onChange={handleChange} placeholder="Kennzeichen" className="input-field" />
+           <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="status">
+              Status
+            </label>
+            <select name="status" id="status" value={formData.status} onChange={handleChange} className="input-field w-full">
+              <option value="offen">Offen</option>
+              <option value="geschlossen">Geschlossen</option>
+            </select>
+          </div>
         </div>
       </div>
 

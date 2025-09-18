@@ -7,52 +7,43 @@ import React from 'react';
  * @param {function} onEdit - Die Callback-Funktion zum Bearbeiten einer Akte.
  * @param {function} onDelete - Die Callback-Funktion zum Löschen einer Akte.
  */
-export const AktenList = ({ records, mandanten, onEdit, onDelete }) => {
+export const AktenList = ({ records, mandanten, onEdit }) => {
+  // onDelete prop is removed as per requirements
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+    <div className="overflow-x-auto bg-white rounded-lg shadow-md">
       <table className="min-w-full table-auto">
-        <thead className="bg-gray-200 border-b border-gray-300">
+        <thead className="bg-gray-50 border-b border-gray-200">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-              Aktenzeichen
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-              Mandant
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-              Beschreibung
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-              Aktionen
-            </th>
+            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Aktenzeichen</th>
+            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Mandant</th>
+            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Gegner</th>
+            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Schaden-Datum</th>
+            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Kennzeichen</th>
+            <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Aktionen</th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {records.map((record) => {
             const mandant = mandanten.find(m => m.id === record.mandantId);
             return (
-              <tr key={record.id} className="hover:bg-gray-50 transition-colors duration-200">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {record.caseNumber}
+              <tr key={record.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">{record.caseNumber}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{mandant ? mandant.name : 'N/A'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${record.status === 'offen' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {record.status}
+                  </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {mandant ? mandant.name : 'Unbekannt'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {record.description}
-                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{record.gegner || 'N/A'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{record.schadenDatum || 'N/A'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{record.kennzeichen || 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button
                     onClick={() => onEdit(record)}
-                    className="text-indigo-600 hover:text-indigo-900 font-semibold px-2 py-1 rounded-lg hover:bg-indigo-100 transition-colors duration-200 mr-2"
+                    className="text-indigo-600 hover:text-indigo-900 font-semibold"
                   >
                     Bearbeiten
-                  </button>
-                  <button
-                    onClick={() => onDelete(record.id)}
-                    className="text-red-600 hover:text-red-900 font-semibold px-2 py-1 rounded-lg hover:bg-red-100 transition-colors duration-200"
-                  >
-                    Löschen
                   </button>
                 </td>
               </tr>

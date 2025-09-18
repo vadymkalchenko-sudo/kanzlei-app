@@ -74,12 +74,14 @@ export const useKanzleiLogic = () => {
     }
   };
 
+  const nextCaseNumber = generateNewCaseNumber(records.length);
+
   const handleRecordSubmit = async (formData) => {
     try {
-      const { id, isNewMandant, mandantId, name, email, street, zipCode, city, description, status } = formData;
+      const { id, isNewMandant, mandantId, name, email, street, zipCode, city, status, gegner, schadenDatum, kennzeichen } = formData;
 
       const mandantData = { name, email, street, zipCode, city };
-      const recordCoreData = { description, status };
+      const recordCoreData = { status, gegner, schadenDatum, kennzeichen };
 
       let finalMandantId = mandantId;
       let mandantUpdated = false;
@@ -127,7 +129,7 @@ export const useKanzleiLogic = () => {
         const newRecord = {
           ...recordCoreData,
           mandantId: finalMandantId,
-          caseNumber: generateNewCaseNumber(records.length),
+          caseNumber: nextCaseNumber,
         };
         await api.createRecord(newRecord);
         setMessage(prev => (prev || '') + 'Neue Akte erfolgreich angelegt!');
@@ -191,6 +193,7 @@ export const useKanzleiLogic = () => {
     fetchData,
     handleExport,
     handleImport,
+    nextCaseNumber,
   };
 };
 
