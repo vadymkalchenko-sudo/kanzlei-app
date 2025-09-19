@@ -91,13 +91,24 @@ export const useKanzleiLogic = () => {
 
   const handleRecordSubmit = async (formData) => {
     try {
-      const { id, isNewMandant, mandantId, name, email, street, zipCode, city, status, gegner, schadenDatum, kennzeichen } = formData;
+      const {
+        id, isNewMandant, mandantId,
+        anrede, vorname, nachname, strasse, hausnummer, plz, stadt, email, telefon, iban, notizen,
+        status, gegner, unfallDatum, kennzeichen, mdtKennzeichen, gegnerKennzeichen
+      } = formData;
 
-      const mandantData = { name, email, street, zipCode, city };
-      const recordCoreData = { status, gegner, schadenDatum, kennzeichen };
+      // Combine vorname and nachname for the 'name' field expected by the backend.
+      const name = `${vorname} ${nachname}`.trim();
+
+      const mandantData = {
+        anrede, name, strasse, hausnummer, plz, stadt, email, telefon, iban, notizen
+      };
+
+      const recordCoreData = {
+        status, gegner, schadenDatum: unfallDatum, kennzeichen, mdtKennzeichen, gegnerKennzeichen
+      };
 
       let finalMandantId = mandantId;
-      let mandantUpdated = false;
 
       // Logic for handling Mandant data
       if (isNewMandant) {
@@ -106,7 +117,15 @@ export const useKanzleiLogic = () => {
         setMessage('Neuer Mandant wurde angelegt. ');
       } else if (mandantId) {
         const originalMandant = mandanten.find(m => m.id === mandantId);
-        const hasChanged = Object.keys(mandantData).some(key => mandantData[key] !== originalMandant[key]);
+        // Create a comparable version of the new data
+        const updatedMandantData = { ...originalMandant, ...mandantData };
+
+        const hasChanged = Object.keys(mandantData).some(key => {
+            // Normalize empty strings and null/undefined for comparison
+            const oldValue = originalMandant[key] || '';
+            const newValue = updatedMandantData[key] || '';
+            return oldValue !== newValue;
+        });
 
         if (hasChanged) {
           const confirmUpdate = window.confirm(
@@ -114,7 +133,7 @@ export const useKanzleiLogic = () => {
           );
 
           if (confirmUpdate) {
-            await api.updateMandant(mandantId, { ...originalMandant, ...mandantData });
+            await api.updateMandant(mandantId, updatedMandantData);
             setMessage('Mandantendaten wurden aktualisiert. ');
           } else {
             const newMandant = await api.createMandant(mandantData);
@@ -128,11 +147,10 @@ export const useKanzleiLogic = () => {
       if (id) { // Akte bearbeiten
         const recordData = { ...recordCoreData, mandantId: finalMandantId };
 
-        // Aktenabschluss-Logik
         const originalRecord = records.find(r => r.id === id);
         if (recordData.status === 'geschlossen' && originalRecord?.status !== 'geschlossen') {
           const clientForArchiving = mandanten.find(m => m.id === finalMandantId);
-          recordData.archivedMandantData = { ...clientForArchiving };
+          recordData.archivedMandantData = { ...clientForArchiving, ...mandantData }; // Archive new data
            setMessage(prev => (prev || '') + 'Akte wurde geschlossen und Mandantendaten archiviert. ');
         }
 
