@@ -3,6 +3,7 @@ import { useKanzleiLogic } from './hooks/useKanzleiLogic.js';
 import { Modal } from './components/ui/Modal.jsx';
 import { AktenList } from './components/AktenList.jsx';
 import AktenForm from './components/AktenForm.jsx';
+import Stammdatenverwaltung from './components/Stammdatenverwaltung.jsx';
 
 // Hauptkomponente, die die gesamte Anwendung darstellt
 export const App = () => {
@@ -10,15 +11,21 @@ export const App = () => {
     isAppReady,
     mandanten,
     records,
+    dritteBeteiligte,
     message,
     setMessage,
     handleRecordSubmit,
+    handleMandantSubmit,
+    handleDeleteMandant,
+    handleDritteSubmit,
+    handleDeleteDritte,
     handleExport,
     handleImport,
     nextCaseNumber,
     setSearchTerm,
   } = useKanzleiLogic();
   
+  const [currentView, setCurrentView] = useState('akten');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const importInputRef = useRef(null);
@@ -122,38 +129,57 @@ export const App = () => {
 
         {/* Hauptansicht */}
         <main>
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-semibold text-gray-700">Aktenübersicht</h2>
-            <button onClick={() => handleOpenAkteModal(null)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105">
-              + Neue Akte anlegen
-            </button>
-          </div>
-
-          {/* Suchleiste */}
-          <div className="mb-6">
-            <input
-              type="search"
-              placeholder="Suche nach Aktenzeichen oder Mandant..."
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {isAppReady ? (
-            records.length > 0 ? (
-              <AktenList
-                records={records}
-                mandanten={mandanten}
-                onEdit={handleOpenAkteModal}
-              />
-            ) : (
-              <div className="text-center py-12 bg-gray-50 rounded-lg">
-                <p className="text-gray-500">Keine Akten gefunden.</p>
-                <p className="text-gray-400 text-sm mt-2">Klicken Sie auf "+ Neue Akte anlegen", um zu beginnen.</p>
+          {currentView === 'akten' ? (
+            <>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-semibold text-gray-700">Aktenübersicht</h2>
+                <div className="flex items-center">
+                  <button onClick={() => setCurrentView('stammdaten')} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 mr-4">
+                    Stammdaten verwalten
+                  </button>
+                  <button onClick={() => handleOpenAkteModal(null)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105">
+                    + Neue Akte anlegen
+                  </button>
+                </div>
               </div>
-            )
+
+              {/* Suchleiste */}
+              <div className="mb-6">
+                <input
+                  type="search"
+                  placeholder="Suche nach Aktenzeichen oder Mandant..."
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {isAppReady ? (
+                records.length > 0 ? (
+                  <AktenList
+                    records={records}
+                    mandanten={mandanten}
+                    onEdit={handleOpenAkteModal}
+                  />
+                ) : (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg">
+                    <p className="text-gray-500">Keine Akten gefunden.</p>
+                    <p className="text-gray-400 text-sm mt-2">Klicken Sie auf "+ Neue Akte anlegen", um zu beginnen.</p>
+                  </div>
+                )
+              ) : (
+                <p className="text-center text-gray-500 py-12">Lade Akten...</p>
+              )}
+            </>
           ) : (
-            <p className="text-center text-gray-500 py-12">Lade Akten...</p>
+            <Stammdatenverwaltung
+              onGoBack={() => setCurrentView('akten')}
+              mandanten={mandanten}
+              dritteBeteiligte={dritteBeteiligte}
+              onMandantSubmit={handleMandantSubmit}
+              onMandantDelete={handleDeleteMandant}
+              onDritteSubmit={handleDritteSubmit}
+              onDritteDelete={handleDeleteDritte}
+            />
           )}
         </main>
         
@@ -163,6 +189,7 @@ export const App = () => {
             <AktenForm
               akte={selectedItem}
               mandanten={mandanten}
+              dritteBeteiligte={dritteBeteiligte}
               onSubmit={handleRecordSubmit}
               onCancel={handleCloseModal}
               nextCaseNumber={nextCaseNumber}

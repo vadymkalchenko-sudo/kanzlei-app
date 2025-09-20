@@ -18,18 +18,24 @@ const seedInitialData = () => {
   ];
 
   const records = [
-    { id: 'r1', mandantId: 'm1', caseNumber: '1.24.awr', status: 'offen', gegner: 'Versicherung AG', schadenDatum: '2024-01-15', kennzeichen: 'B-MV-123' },
-    { id: 'r2', mandantId: 'm2', caseNumber: '2.24.awr', status: 'offen', gegner: 'Haftpflicht GmbH', schadenDatum: '2024-02-20', kennzeichen: 'H-XY-456' },
-    { id: 'r3', mandantId: 'm1', caseNumber: '3.24.awr', status: 'geschlossen', gegner: 'Gegner Anwalt', schadenDatum: '2023-11-10', kennzeichen: 'B-AB-789', archivedMandantData: { id: 'm1', name: 'Max Mustermann', email: 'max@example.com', street: 'Musterstraße 1', zipCode: '12345', city: 'Musterstadt' } },
+    { id: 'rec1', mandantId: 'm1', caseNumber: '101.24.awr', status: 'offen', gegner: 'Gegnerische Versicherung', schadenDatum: '2024-03-01', kennzeichen: 'B-OS-123' },
+    { id: 'rec2', mandantId: 'm2', caseNumber: '102.24.awr', status: 'offen', gegner: 'Unfallgegner GmbH', schadenDatum: '2024-02-15', kennzeichen: 'M-AX-456' },
+    { id: 'rec3', mandantId: 'm3', caseNumber: '103.24.awr', status: 'geschlossen', gegner: 'Anwaltskanzlei Dr. Streber', schadenDatum: '2023-12-20', kennzeichen: 'K-LN-789' },
   ];
 
   localStorage.setItem('mandanten', JSON.stringify(mandanten));
   localStorage.setItem('records', JSON.stringify(records));
+
+  const dritteBeteiligte = [
+    { id: 'd1', name: 'Gutachter Schmidt', email: 'gutachter@example.com', street: 'Prüfweg 10', zipCode: '10115', city: 'Berlin' },
+  ];
+  localStorage.setItem('dritteBeteiligte', JSON.stringify(dritteBeteiligte));
 };
 
 const checkAndSeedData = () => {
   const mandanten = localStorage.getItem('mandanten');
-  if (!mandanten) {
+  const dritte = localStorage.getItem('dritteBeteiligte');
+  if (!mandanten || !dritte) {
     console.log('No data found in localStorage. Seeding initial data.');
     seedInitialData();
   }
@@ -68,6 +74,38 @@ export const deleteMandant = async (mandantId) => {
   mandanten = mandanten.filter(m => m.id !== mandantId);
   localStorage.setItem('mandanten', JSON.stringify(mandanten));
   return Promise.resolve({ message: 'Mandant gelöscht' });
+};
+
+// Dritte Beteiligte API
+export const getDritteBeteiligte = async () => {
+  console.log('API: getDritteBeteiligte called');
+  checkAndSeedData(); // Ensure data exists
+  const dritte = JSON.parse(localStorage.getItem('dritteBeteiligte')) || [];
+  return Promise.resolve(dritte);
+};
+
+export const createDritteBeteiligte = async (data) => {
+  console.log('API: createDritteBeteiligte called with', data);
+  const dritte = JSON.parse(localStorage.getItem('dritteBeteiligte')) || [];
+  const newItem = { ...data, id: `d${new Date().toISOString()}` };
+  localStorage.setItem('dritteBeteiligte', JSON.stringify([...dritte, newItem]));
+  return Promise.resolve(newItem);
+};
+
+export const updateDritteBeteiligte = async (id, data) => {
+  console.log('API: updateDritteBeteiligte called with', id, data);
+  let dritte = JSON.parse(localStorage.getItem('dritteBeteiligte')) || [];
+  dritte = dritte.map(d => d.id === id ? { ...d, ...data } : d);
+  localStorage.setItem('dritteBeteiligte', JSON.stringify(dritte));
+  return Promise.resolve({ ...data, id });
+};
+
+export const deleteDritteBeteiligte = async (id) => {
+  console.log('API: deleteDritteBeteiligte called with', id);
+  let dritte = JSON.parse(localStorage.getItem('dritteBeteiligte')) || [];
+  dritte = dritte.filter(d => d.id !== id);
+  localStorage.setItem('dritteBeteiligte', JSON.stringify(dritte));
+  return Promise.resolve({ message: 'Dritter Beteiligter gelöscht' });
 };
 
 // Akten API
