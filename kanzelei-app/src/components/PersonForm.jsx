@@ -1,15 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './ui/Button.jsx';
 
 const PersonForm = ({ person, onSubmit, onCancel, title }) => {
   const [formData, setFormData] = useState({
-    name: '',
+    anrede: '',
+    vorname: '',
+    nachname: '',
+    strasse: '',
+    hausnummer: '',
+    plz: '',
+    stadt: '',
     email: '',
-    street: '',
-    zipCode: '',
-    city: '',
+    telefon: '',
+    iban: '',
+    notizen: '',
     ...person,
   });
+
+  useEffect(() => {
+    if (person && person.name) {
+      const nameParts = person.name.split(' ') || ['', ''];
+      const vorname = nameParts[0];
+      const nachname = nameParts.slice(1).join(' ');
+      setFormData(prev => ({ ...prev, ...person, vorname, nachname }));
+    } else {
+      setFormData(prev => ({ ...prev, ...person }));
+    }
+  }, [person]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -18,90 +35,40 @@ const PersonForm = ({ person, onSubmit, onCancel, title }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(formData);
+    const { vorname, nachname, ...rest } = formData;
+    const name = `${vorname} ${nachname}`.trim();
+    onSubmit({ ...rest, name });
     onCancel();
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-6">
-      <h3 className="text-xl font-bold mb-4">
-        {title}
-      </h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="name">
-            Name
-          </label>
-          <input
-            type="text"
-            name="name"
-            id="name"
-            value={formData.name}
-            onChange={handleChange}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring focus:ring-blue-500"
-            required
-          />
+    <form onSubmit={handleSubmit} className="p-6 bg-white rounded-lg">
+      <h3 className="text-xl font-bold mb-6 text-gray-800">{title}</h3>
+      <div className="space-y-4">
+        <select name="anrede" value={formData.anrede} onChange={handleChange} className="input-field w-full">
+          <option value="">Anrede</option>
+          <option value="Herr">Herr</option>
+          <option value="Frau">Frau</option>
+        </select>
+        <div className="flex gap-4">
+          <input type="text" name="vorname" value={formData.vorname} onChange={handleChange} placeholder="Vorname" className="input-field w-1/2" required />
+          <input type="text" name="nachname" value={formData.nachname} onChange={handleChange} placeholder="Nachname" className="input-field w-1/2" required />
         </div>
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">
-            E-Mail
-          </label>
-          <input
-            type="email"
-            name="email"
-            id="email"
-            value={formData.email}
-            onChange={handleChange}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring focus:ring-blue-500"
-            required
-          />
+        <div className="flex gap-4">
+          <input type="text" name="strasse" value={formData.strasse} onChange={handleChange} placeholder="Straße" className="input-field w-2/3" />
+          <input type="text" name="hausnummer" value={formData.hausnummer} onChange={handleChange} placeholder="Nr." className="input-field w-1/3" />
         </div>
-        <div className="mb-4 md:col-span-2">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="street">
-            Straße
-          </label>
-          <input
-            type="text"
-            name="street"
-            id="street"
-            value={formData.street}
-            onChange={handleChange}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring focus:ring-blue-500"
-          />
+        <div className="flex gap-4">
+          <input type="text" name="plz" value={formData.plz} onChange={handleChange} placeholder="PLZ" className="input-field w-1/3" />
+          <input type="text" name="stadt" value={formData.stadt} onChange={handleChange} placeholder="Stadt" className="input-field w-2/3" />
         </div>
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="zipCode">
-            PLZ
-          </label>
-          <input
-            type="text"
-            name="zipCode"
-            id="zipCode"
-            value={formData.zipCode}
-            onChange={handleChange}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring focus:ring-blue-500"
-          />
-        </div>
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="city">
-            Ort
-          </label>
-          <input
-            type="text"
-            name="city"
-            id="city"
-            value={formData.city}
-            onChange={handleChange}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring focus:ring-blue-500"
-          />
-        </div>
+        <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="E-Mail-Adresse" className="input-field w-full" />
+        <input type="tel" name="telefon" value={formData.telefon} onChange={handleChange} placeholder="Telefonnummer" className="input-field w-full" />
+        <input type="text" name="iban" value={formData.iban} onChange={handleChange} placeholder="IBAN" className="input-field w-full" />
+        <textarea name="notizen" value={formData.notizen} onChange={handleChange} placeholder="Notizen..." className="input-field w-full h-24"></textarea>
       </div>
-      <div className="flex justify-end space-x-4 mt-6">
-        <Button
-          type="button"
-          onClick={onCancel}
-          className="bg-gray-300 hover:bg-gray-400 text-gray-800"
-        >
+      <div className="flex justify-end space-x-4 mt-8">
+        <Button type="button" onClick={onCancel} className="bg-gray-300 hover:bg-gray-400 text-gray-800">
           Abbrechen
         </Button>
         <Button type="submit">
