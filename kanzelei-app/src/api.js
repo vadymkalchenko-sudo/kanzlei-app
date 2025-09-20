@@ -20,7 +20,7 @@ const seedInitialData = () => {
   const records = [
     {
       id: 'rec1', mandantId: 'm1', caseNumber: '101.24.awr', status: 'offen', gegner: 'Gegnerische Versicherung', schadenDatum: '2024-03-01', kennzeichen: 'B-OS-123',
-      dokumente: [{datum: '2024-03-01', beschreibung: 'Unfallbericht', soll: 500.00, haben: 0}],
+      dokumente: [{datum: '2024-03-01', beschreibung: 'Unfallbericht', format: 'PDF', soll: 500.00, haben: 0}],
       notizen: [{datum: '2024-03-02', titel: 'Erstanruf', inhalt: 'Mandant hat den Unfall gemeldet.'}],
       fristen: [{datum: '2024-03-15', notiz: 'Klage einreichen'}],
       wiedervorlagen: [{datum: '2024-03-08', notiz: 'Rücksprache mit Mandant'}],
@@ -34,7 +34,7 @@ const seedInitialData = () => {
     },
     {
       id: 'rec3', mandantId: 'm3', caseNumber: '103.24.awr', status: 'geschlossen', gegner: 'Anwaltskanzlei Dr. Streber', schadenDatum: '2023-12-20', kennzeichen: 'K-LN-789',
-      dokumente: [{datum: '2023-12-20', beschreibung: 'Abschlussrechnung', soll: 0, haben: 1200.00}],
+      dokumente: [{datum: '2023-12-20', beschreibung: 'Abschlussrechnung', format: 'PDF', soll: 0, haben: 1200.00}],
       notizen: [{datum: '2023-12-21', titel: 'Fall geschlossen', inhalt: 'Zahlung erhalten, Fall abgeschlossen.'}],
       fristen: [],
       wiedervorlagen: [],

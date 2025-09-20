@@ -4,6 +4,7 @@ import { Modal } from './components/ui/Modal.jsx';
 import { AktenList } from './components/AktenList.jsx';
 import AktenForm from './components/AktenForm.jsx';
 import Stammdatenverwaltung from './components/Stammdatenverwaltung.jsx';
+import Aktenansicht from './components/Aktenansicht.jsx';
 
 // Hauptkomponente, die die gesamte Anwendung darstellt
 export const App = () => {
@@ -45,7 +46,16 @@ export const App = () => {
   
   const handleOpenAkteModal = (akte = null) => {
     setSelectedItem(akte);
-    setIsModalOpen(true);
+    if (akte) {
+      setCurrentView('akten_detail');
+    } else {
+      setIsModalOpen(true);
+    }
+  };
+
+  const handleGoBackToList = () => {
+    setSelectedItem(null);
+    setCurrentView('akten');
   };
 
   const handleCloseModal = () => {
@@ -135,8 +145,8 @@ export const App = () => {
 
         {/* Hauptansicht */}
         <main>
-          {currentView === 'akten' ? (
-            <>
+          {currentView === 'akten' && (
+             <>
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-semibold text-gray-700">Aktenübersicht</h2>
                 <div className="flex items-center">
@@ -160,25 +170,20 @@ export const App = () => {
               </div>
 
               {isAppReady ? (
-                records.length > 0 ? (
-                  <AktenList
-                    records={records}
-                    mandanten={mandanten}
-                    onEdit={handleOpenAkteModal}
-                  />
-                ) : (
-                  <div className="text-center py-12 bg-gray-50 rounded-lg">
-                    <p className="text-gray-500">Keine Akten gefunden.</p>
-                    <p className="text-gray-400 text-sm mt-2">Klicken Sie auf "+ Neue Akte anlegen", um zu beginnen.</p>
-                  </div>
-                )
+                <AktenList
+                  records={records}
+                  mandanten={mandanten}
+                  onEdit={handleOpenAkteModal}
+                />
               ) : (
                 <p className="text-center text-gray-500 py-12">Lade Akten...</p>
               )}
             </>
-          ) : (
+          )}
+
+          {currentView === 'stammdaten' && (
             <Stammdatenverwaltung
-              onGoBack={() => setCurrentView('akten')}
+              onGoBack={handleGoBackToList}
               initialTab={initialStammdatenTab}
               mandanten={mandanten}
               dritteBeteiligte={dritteBeteiligte}
@@ -186,6 +191,14 @@ export const App = () => {
               onMandantDelete={handleDeleteMandant}
               onDritteSubmit={handleDritteSubmit}
               onDritteDelete={handleDeleteDritte}
+            />
+          )}
+
+          {currentView === 'akten_detail' && (
+            <Aktenansicht
+              record={selectedItem}
+              mandant={mandanten.find(m => m.id === selectedItem.mandantId)}
+              onGoBack={handleGoBackToList}
             />
           )}
         </main>
