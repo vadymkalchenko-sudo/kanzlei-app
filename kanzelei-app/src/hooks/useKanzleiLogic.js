@@ -69,6 +69,34 @@ export const useKanzleiLogic = () => {
     }
   };
 
+  const handleAddDocuments = async (recordId, files) => {
+    try {
+      const recordToUpdate = records.find(r => r.id === recordId);
+      if (!recordToUpdate) {
+        throw new Error('Akte nicht gefunden');
+      }
+
+      const newDocuments = Array.from(files).map(file => ({
+        datum: new Date().toISOString().split('T')[0],
+        beschreibung: file.name,
+        format: file.type || 'Unbekannt',
+        soll: 0,
+        haben: 0,
+      }));
+
+      const updatedRecord = {
+        ...recordToUpdate,
+        dokumente: [...(recordToUpdate.dokumente || []), ...newDocuments],
+      };
+
+      await api.updateRecord(recordId, updatedRecord);
+      setMessage(`${files.length} Dokument(e) erfolgreich hinzugefügt.`);
+      fetchData();
+    } catch (error) {
+      setMessage(`Fehler beim Hinzufügen von Dokumenten: ${error.message}`);
+    }
+  };
+
   const handleDeleteMandant = async (mandantId) => {
     try {
       const openRecords = records.filter(
@@ -253,6 +281,7 @@ export const useKanzleiLogic = () => {
     handleDeleteDritte,
     handleRecordSubmit,
     handleDeleteRecord,
+    handleAddDocuments,
     fetchData,
     handleExport,
     handleImport,
