@@ -24,15 +24,16 @@ const initialFormData = {
   mandantId: '',
 };
 
-export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onSubmit, onCancel, nextCaseNumber, onNavigateToStammdaten }) => {
+export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onSubmit, onCancel, nextCaseNumber, handleDritteSubmit }) => {
   const [formData, setFormData] = useState({ ...initialFormData, ...akte });
   const [isNewMandant, setIsNewMandant] = useState(!akte?.mandantId);
   const [errors, setErrors] = useState({});
-  const dateInputRef = useRef(null);
 
   // State for Dritte Beteiligte search
   const [dritteSearch, setDritteSearch] = useState('');
   const [selectedDritte, setSelectedDritte] = useState([]);
+  const [isBeteiligteOpen, setIsBeteiligteOpen] = useState(false);
+  const [isAddBeteiligteModalOpen, setIsAddBeteiligteModalOpen] = useState(false);
 
   // Effect to populate selectedDritte when editing an existing Akte
   useEffect(() => {
@@ -68,11 +69,6 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onSubmit, onCance
           kennzeichen: akte.kennzeichen,
           sonstigeBeteiligte: akte.sonstigeBeteiligte || '',
         }));
-      }
-    } else {
-      if (dateInputRef.current) {
-        dateInputRef.current.value = '';
-        dateInputRef.current.type = 'text';
       }
     }
   }, [akte, mandanten]);
@@ -111,6 +107,11 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onSubmit, onCance
 
   const handleDeselectDritte = (personId) => {
     setSelectedDritte(prev => prev.filter(p => p.id !== personId));
+  };
+
+  const handleAddBeteiligteSubmit = async (personData) => {
+    await handleDritteSubmit(personData);
+    setIsAddBeteiligteModalOpen(false);
   };
 
   const validate = () => {
@@ -197,7 +198,18 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onSubmit, onCance
             {/* Falldaten part is unchanged */}
             <input type="text" name="mdtKennzeichen" value={formData.mdtKennzeichen} onChange={handleChange} placeholder="MDT Kennzeichen" className="input-field w-full" />
             <input type="text" name="gegnerKennzeichen" value={formData.gegnerKennzeichen} onChange={handleChange} placeholder="Gegner Kennzeichen" className="input-field w-full" />
-            <div><input type="date" name="unfallDatum" ref={dateInputRef} value={formData.unfallDatum} onChange={handleChange} className="input-field w-full text-gray-500" onFocus={() => dateInputRef.current.type = 'date'} onBlur={() => !formData.unfallDatum && (dateInputRef.current.type = 'text')} placeholder="Unfall Datum" /></div>
+            <div>
+              <input
+                type={formData.unfallDatum ? 'date' : 'text'}
+                name="unfallDatum"
+                value={formData.unfallDatum}
+                onChange={handleChange}
+                onFocus={(e) => e.target.type = 'date'}
+                onBlur={(e) => { if (!e.target.value) e.target.type = 'text'; }}
+                placeholder="Unfall Datum"
+                className="input-field w-full text-gray-500"
+              />
+            </div>
             <input type="text" name="gegner" value={formData.gegner} onChange={handleChange} placeholder="Gegner Name" className="input-field w-full" />
             <input type="text" name="kennzeichen" value={formData.kennzeichen} onChange={handleChange} placeholder="Kennzeichen" className="input-field w-full" />
             {akte && (
@@ -211,73 +223,86 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onSubmit, onCance
             )}
             <div className="pt-2"><label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="caseNumber">Aktennummer</label><input type="text" name="caseNumber" id="caseNumber" value={formData.caseNumber || nextCaseNumber} className="input-field bg-gray-200 w-full" disabled /></div>
 
-            {/* Beteiligte Section */}
+            {/* Beteiligte Section (Accordion) */}
             <div className="pt-4 border-t mt-4">
-              <h4 className="text-lg font-semibold mb-2">Beteiligte</h4>
-              <div className="mb-4">
-                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="dritteSearch">
-                  Dritte Beteiligte (aus Stammdaten)
-                </label>
-                <div className="relative">
-                  <input
-                    type="search"
-                    id="dritteSearch"
-                    value={dritteSearch}
-                    onChange={(e) => setDritteSearch(e.target.value)}
-                    placeholder="Suchen..."
-                    className="input-field w-full"
-                  />
-                  {filteredDritte.length > 0 && (
-                    <div className="absolute z-10 w-full bg-white border rounded-b-lg max-h-48 overflow-y-auto">
-                      {filteredDritte.map(person => (
-                        <div
-                          key={person.id}
-                          onClick={() => handleSelectDritte(person)}
-                          className="p-2 hover:bg-gray-100 cursor-pointer"
-                        >
-                          {person.name}
+              <button
+                type="button"
+                onClick={() => setIsBeteiligteOpen(!isBeteiligteOpen)}
+                className="w-full flex justify-between items-center text-lg font-semibold text-left"
+              >
+                Beteiligte
+                <span className={`transform transition-transform duration-200 ${isBeteiligteOpen ? 'rotate-180' : ''}`}>
+                  &#9660;
+                </span>
+              </button>
+              {isBeteiligteOpen && (
+                <div className="mt-4 space-y-4">
+                  <div className="mb-4">
+                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="dritteSearch">
+                      Dritte Beteiligte (aus Stammdaten)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="search"
+                        id="dritteSearch"
+                        value={dritteSearch}
+                        onChange={(e) => setDritteSearch(e.target.value)}
+                        placeholder="Suchen..."
+                        className="input-field w-full"
+                      />
+                      {filteredDritte.length > 0 && (
+                        <div className="absolute z-10 w-full bg-white border rounded-b-lg max-h-48 overflow-y-auto">
+                          {filteredDritte.map(person => (
+                            <div
+                              key={person.id}
+                              onClick={() => handleSelectDritte(person)}
+                              className="p-2 hover:bg-gray-100 cursor-pointer"
+                            >
+                              {person.name}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {selectedDritte.map(person => (
+                        <div key={person.id} className="flex items-center bg-blue-100 text-blue-800 text-sm font-semibold px-2 py-1 rounded-full">
+                          <span>{person.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeselectDritte(person.id)}
+                            className="ml-2 text-blue-600 hover:text-blue-800"
+                          >
+                            &times;
+                          </button>
                         </div>
                       ))}
                     </div>
-                  )}
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {selectedDritte.map(person => (
-                    <div key={person.id} className="flex items-center bg-blue-100 text-blue-800 text-sm font-semibold px-2 py-1 rounded-full">
-                      <span>{person.name}</span>
-                      <button
+                    <div className="mt-4">
+                      <Button
                         type="button"
-                        onClick={() => handleDeselectDritte(person.id)}
-                        className="ml-2 text-blue-600 hover:text-blue-800"
+                    onClick={() => setIsAddBeteiligteModalOpen(true)}
+                        className="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm py-1 px-3"
                       >
-                        &times;
-                      </button>
+                        Beteiligten hinzufügen
+                      </Button>
                     </div>
-                  ))}
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="sonstigeBeteiligte">
+                      Sonstige Beteiligte (Freitext)
+                    </label>
+                    <textarea
+                      name="sonstigeBeteiligte"
+                      id="sonstigeBeteiligte"
+                      value={formData.sonstigeBeteiligte}
+                      onChange={handleChange}
+                      className="input-field w-full h-20"
+                      placeholder="Weitere beteiligte Personen oder Firmen..."
+                    />
+                  </div>
                 </div>
-                <div className="mt-4">
-                  <Button
-                    type="button"
-                    onClick={() => onNavigateToStammdaten('dritte')}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm py-1 px-3"
-                  >
-                    Beteiligten hinzufügen
-                  </Button>
-                </div>
-              </div>
-              <div>
-                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="sonstigeBeteiligte">
-                  Sonstige Beteiligte (Freitext)
-                </label>
-                <textarea
-                  name="sonstigeBeteiligte"
-                  id="sonstigeBeteiligte"
-                  value={formData.sonstigeBeteiligte}
-                  onChange={handleChange}
-                  className="input-field w-full h-20"
-                  placeholder="Weitere beteiligte Personen oder Firmen..."
-                />
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -286,6 +311,14 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onSubmit, onCance
         <Button type="button" onClick={onCancel} className="bg-gray-300 hover:bg-gray-400 text-gray-800">Abbrechen</Button>
         <Button type="submit">Speichern</Button>
       </div>
+
+      <Modal isOpen={isAddBeteiligteModalOpen} onClose={() => setIsAddBeteiligteModalOpen(false)}>
+        <PersonForm
+          onSubmit={handleAddBeteiligteSubmit}
+          onCancel={() => setIsAddBeteiligteModalOpen(false)}
+          title="Neuen Beteiligten anlegen"
+        />
+      </Modal>
     </form>
   );
 };

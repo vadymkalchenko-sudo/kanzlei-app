@@ -201,6 +201,7 @@ export const App = () => {
               onCancel={handleCloseModal}
               nextCaseNumber={nextCaseNumber}
               onNavigateToStammdaten={navigateToStammdaten}
+              handleDritteSubmit={handleDritteSubmit}
             />
           )}
         </Modal>
