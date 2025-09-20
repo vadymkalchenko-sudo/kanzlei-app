@@ -26,11 +26,17 @@ export const App = () => {
   } = useKanzleiLogic();
   
   const [currentView, setCurrentView] = useState('akten');
+  const [initialStammdatenTab, setInitialStammdatenTab] = useState('mandanten');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const importInputRef = useRef(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+
+  const navigateToStammdaten = (tab = 'mandanten') => {
+    setInitialStammdatenTab(tab);
+    setCurrentView('stammdaten');
+  };
 
   // Schließt die Meldungsanzeige
   const handleCloseMessage = () => {
@@ -134,7 +140,7 @@ export const App = () => {
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-semibold text-gray-700">Aktenübersicht</h2>
                 <div className="flex items-center">
-                  <button onClick={() => setCurrentView('stammdaten')} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 mr-4">
+                  <button onClick={() => navigateToStammdaten('mandanten')} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 mr-4">
                     Stammdaten verwalten
                   </button>
                   <button onClick={() => handleOpenAkteModal(null)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105">
@@ -173,6 +179,7 @@ export const App = () => {
           ) : (
             <Stammdatenverwaltung
               onGoBack={() => setCurrentView('akten')}
+              initialTab={initialStammdatenTab}
               mandanten={mandanten}
               dritteBeteiligte={dritteBeteiligte}
               onMandantSubmit={handleMandantSubmit}
@@ -193,6 +200,7 @@ export const App = () => {
               onSubmit={handleRecordSubmit}
               onCancel={handleCloseModal}
               nextCaseNumber={nextCaseNumber}
+              onNavigateToStammdaten={navigateToStammdaten}
             />
           )}
         </Modal>

@@ -24,7 +24,7 @@ const initialFormData = {
   mandantId: '',
 };
 
-export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onSubmit, onCancel, nextCaseNumber }) => {
+export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onSubmit, onCancel, nextCaseNumber, onNavigateToStammdaten }) => {
   const [formData, setFormData] = useState({ ...initialFormData, ...akte });
   const [isNewMandant, setIsNewMandant] = useState(!akte?.mandantId);
   const [errors, setErrors] = useState({});
@@ -200,7 +200,15 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onSubmit, onCance
             <div><input type="date" name="unfallDatum" ref={dateInputRef} value={formData.unfallDatum} onChange={handleChange} className="input-field w-full text-gray-500" onFocus={() => dateInputRef.current.type = 'date'} onBlur={() => !formData.unfallDatum && (dateInputRef.current.type = 'text')} placeholder="Unfall Datum" /></div>
             <input type="text" name="gegner" value={formData.gegner} onChange={handleChange} placeholder="Gegner Name" className="input-field w-full" />
             <input type="text" name="kennzeichen" value={formData.kennzeichen} onChange={handleChange} placeholder="Kennzeichen" className="input-field w-full" />
-            <div className="pt-2"><label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="status">Status</label>{akte ? (<select name="status" id="status" value={formData.status} onChange={handleChange} className="input-field w-full"><option value="offen">Offen</option><option value="geschlossen">Geschlossen</option></select>) : (<input type="text" value="offen" className="input-field bg-gray-200 w-full" disabled />)}</div>
+            {akte && (
+              <div className="pt-2">
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="status">Status</label>
+                <select name="status" id="status" value={formData.status} onChange={handleChange} className="input-field w-full">
+                  <option value="offen">Offen</option>
+                  <option value="geschlossen">Geschlossen</option>
+                </select>
+              </div>
+            )}
             <div className="pt-2"><label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="caseNumber">Aktennummer</label><input type="text" name="caseNumber" id="caseNumber" value={formData.caseNumber || nextCaseNumber} className="input-field bg-gray-200 w-full" disabled /></div>
 
             {/* Beteiligte Section */}
@@ -246,6 +254,15 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onSubmit, onCance
                       </button>
                     </div>
                   ))}
+                </div>
+                <div className="mt-4">
+                  <Button
+                    type="button"
+                    onClick={() => onNavigateToStammdaten('dritte')}
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm py-1 px-3"
+                  >
+                    Beteiligten hinzufügen
+                  </Button>
                 </div>
               </div>
               <div>

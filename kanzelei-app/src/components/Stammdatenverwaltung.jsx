@@ -6,6 +6,7 @@ import { Button } from './ui/Button.jsx';
 
 export const Stammdatenverwaltung = ({
   onGoBack,
+  initialTab = 'mandanten',
   mandanten,
   dritteBeteiligte,
   onMandantSubmit,
@@ -13,9 +14,10 @@ export const Stammdatenverwaltung = ({
   onDritteSubmit,
   onDritteDelete,
 }) => {
-  const [activeTab, setActiveTab] = useState('mandanten');
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const handleOpenModal = (item = null) => {
     setSelectedItem(item);
@@ -32,6 +34,10 @@ export const Stammdatenverwaltung = ({
   const handleDelete = isMandantenTab ? onMandantDelete : onDritteDelete;
   const handleSubmit = isMandantenTab ? onMandantSubmit : onDritteSubmit;
   const title = isMandantenTab ? 'Mandant' : 'Dritter Beteiligter';
+
+  const filteredItems = items.filter(item =>
+    item.name && item.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div>
@@ -57,14 +63,23 @@ export const Stammdatenverwaltung = ({
         </button>
       </div>
 
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-between items-center mb-4">
+        <div className="w-1/2">
+          <input
+            type="search"
+            placeholder="Suchen..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="input-field w-full"
+          />
+        </div>
         <Button onClick={() => handleOpenModal(null)}>
           + Neuen {title} anlegen
         </Button>
       </div>
 
       <MandantenList
-        mandanten={items}
+        mandanten={filteredItems}
         onEdit={handleOpenModal}
         onDelete={handleDelete}
       />
