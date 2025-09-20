@@ -7,6 +7,8 @@ import { Button } from './ui/Button.jsx';
 export const Stammdatenverwaltung = ({
   onGoBack,
   initialTab = 'mandanten',
+  itemToEdit,
+  clearItemToEdit,
   mandanten,
   dritteBeteiligte,
   onMandantSubmit,
@@ -23,6 +25,13 @@ export const Stammdatenverwaltung = ({
     setSelectedItem(item);
     setIsModalOpen(true);
   };
+
+  useEffect(() => {
+    if (itemToEdit) {
+      handleOpenModal(itemToEdit);
+      clearItemToEdit();
+    }
+  }, [itemToEdit, clearItemToEdit]);
 
   const handleCloseModal = () => {
     setIsModalOpen(false);

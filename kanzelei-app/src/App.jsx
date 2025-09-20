@@ -28,6 +28,7 @@ export const App = () => {
   
   const [currentView, setCurrentView] = useState('akten');
   const [initialStammdatenTab, setInitialStammdatenTab] = useState('mandanten');
+  const [itemToEdit, setItemToEdit] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const importInputRef = useRef(null);
@@ -56,6 +57,15 @@ export const App = () => {
   const handleGoBackToList = () => {
     setSelectedItem(null);
     setCurrentView('akten');
+  };
+
+  const handleDirectEdit = (item, type) => {
+    setItemToEdit(item);
+    navigateToStammdaten(type);
+  };
+
+  const clearItemToEdit = () => {
+    setItemToEdit(null);
   };
 
   const handleCloseModal = () => {
@@ -185,6 +195,8 @@ export const App = () => {
             <Stammdatenverwaltung
               onGoBack={handleGoBackToList}
               initialTab={initialStammdatenTab}
+              itemToEdit={itemToEdit}
+              clearItemToEdit={clearItemToEdit}
               mandanten={mandanten}
               dritteBeteiligte={dritteBeteiligte}
               onMandantSubmit={handleMandantSubmit}
@@ -199,6 +211,7 @@ export const App = () => {
               record={selectedItem}
               mandant={mandanten.find(m => m.id === selectedItem.mandantId)}
               onGoBack={handleGoBackToList}
+              onDirectEdit={handleDirectEdit}
             />
           )}
         </main>
