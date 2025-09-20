@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/Button.jsx';
 import { Modal } from './ui/Modal.jsx';
+import PersonForm from './PersonForm.jsx';
 
 const initialFormData = {
   anrede: '',
