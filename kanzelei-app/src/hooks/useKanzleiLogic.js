@@ -16,17 +16,20 @@ export const useKanzleiLogic = () => {
   const [isAppReady, setIsAppReady] = useState(false);
   const [records, setRecords] = useState([]);
   const [mandanten, setMandanten] = useState([]);
+  const [dritteBeteiligte, setDritteBeteiligte] = useState([]);
   const [message, setMessage] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchData = useCallback(async () => {
     try {
-      const [mandantenData, recordsData] = await Promise.all([
+      const [mandantenData, recordsData, dritteData] = await Promise.all([
         api.getMandanten(),
         api.getRecords(),
+        api.getDritteBeteiligte(),
       ]);
       setMandanten(mandantenData);
       setRecords(recordsData);
+      setDritteBeteiligte(dritteData);
     } catch (error) {
       setMessage(`Fehler beim Laden der Daten: ${error.message}`);
     } finally {
@@ -35,7 +38,9 @@ export const useKanzleiLogic = () => {
   }, []);
 
   const filteredRecords = useMemo(() => {
-    if (mandanten.length === 0) return [];
+    if (!searchTerm) {
+      return records;
+    }
     const lowercasedFilter = searchTerm.toLowerCase();
     return records.filter(record => {
       const mandant = mandanten.find(m => m.id === record.mandantId);
@@ -81,6 +86,31 @@ export const useKanzleiLogic = () => {
       await api.deleteMandant(mandantId);
       setMessage('Mandant erfolgreich gelöscht!');
       fetchData(); // Daten neu laden
+    } catch (error) {
+      setMessage(`Fehler: ${error.message}`);
+    }
+  };
+
+  const handleDritteSubmit = async (data) => {
+    try {
+      if (data.id) {
+        await api.updateDritteBeteiligte(data.id, data);
+        setMessage('Dritter Beteiligter erfolgreich aktualisiert!');
+      } else {
+        await api.createDritteBeteiligte(data);
+        setMessage('Neuer Dritter Beteiligter erfolgreich angelegt!');
+      }
+      fetchData();
+    } catch (error) {
+      setMessage(`Fehler: ${error.message}`);
+    }
+  };
+
+  const handleDeleteDritte = async (id) => {
+    try {
+      await api.deleteDritteBeteiligte(id);
+      setMessage('Dritter Beteiligter erfolgreich gelöscht!');
+      fetchData();
     } catch (error) {
       setMessage(`Fehler: ${error.message}`);
     }
@@ -214,10 +244,13 @@ export const useKanzleiLogic = () => {
     isAppReady,
     records: filteredRecords, // Pass filtered records to the UI
     mandanten,
+    dritteBeteiligte,
     message,
     setMessage,
     handleMandantSubmit,
     handleDeleteMandant,
+    handleDritteSubmit,
+    handleDeleteDritte,
     handleRecordSubmit,
     handleDeleteRecord,
     fetchData,
