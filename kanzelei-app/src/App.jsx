@@ -20,6 +20,7 @@ export const App = () => {
     handleDeleteMandant,
     handleDritteSubmit,
     handleDeleteDritte,
+    handleAddDocuments,
     handleExport,
     handleImport,
     nextCaseNumber,
@@ -212,6 +213,7 @@ export const App = () => {
               mandant={mandanten.find(m => m.id === selectedItem.mandantId)}
               onGoBack={handleGoBackToList}
               onDirectEdit={handleDirectEdit}
+              onAddDocuments={handleAddDocuments}
             />
           )}
         </main>

@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Button } from './ui/Button.jsx';
 
-export const Aktenansicht = ({ record, mandant, onGoBack, onDirectEdit }) => {
+export const Aktenansicht = ({ record, mandant, onGoBack, onDirectEdit, onAddDocuments }) => {
   const fileInputRef = useRef(null);
 
   const handleDragOver = (e) => {
@@ -10,8 +10,10 @@ export const Aktenansicht = ({ record, mandant, onGoBack, onDirectEdit }) => {
 
   const handleDrop = (e) => {
     e.preventDefault();
-    console.log('Files dropped:', e.dataTransfer.files);
-    alert('Dateien (simuliert) abgelegt!');
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      onAddDocuments(record.id, e.dataTransfer.files);
+      e.dataTransfer.clearData();
+    }
   };
 
   const handleFileSelectClick = () => {
@@ -19,8 +21,9 @@ export const Aktenansicht = ({ record, mandant, onGoBack, onDirectEdit }) => {
   };
 
   const handleFileSelected = (e) => {
-    console.log('Files selected:', e.target.files);
-    alert('Dateien (simuliert) ausgewählt!');
+    if (e.target.files && e.target.files.length > 0) {
+      onAddDocuments(record.id, e.target.files);
+    }
   };
   if (!record || !mandant) {
     return (
