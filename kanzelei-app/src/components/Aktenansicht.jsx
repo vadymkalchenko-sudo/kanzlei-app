@@ -38,6 +38,20 @@ export const Aktenansicht = ({ record, mandant, onGoBack, onDirectEdit, onAddDoc
     alert(`Dokument "${doc.beschreibung}" wird geöffnet... (Simulation)`);
   };
 
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const [year, month, day] = dateString.split('-');
+    return `${day}.${month}.${year}`;
+  };
+
+  const simplifyFormat = (doc) => {
+    const extension = doc.beschreibung.split('.').pop().toLowerCase();
+    if (extension === doc.beschreibung.toLowerCase()) { // No extension found
+      return doc.format || 'Unbekannt';
+    }
+    return extension;
+  };
+
   return (
     <div className="p-4 bg-white rounded-lg shadow-md">
       {/* Header */}
@@ -71,44 +85,45 @@ export const Aktenansicht = ({ record, mandant, onGoBack, onDirectEdit, onAddDoc
       </div>
 
       {/* Document Management Section */}
-      <div>
-        <h3 className="text-xl font-semibold mb-4">Dokumenten- und Zahlungsverwaltung</h3>
-
-        {/* Drag and Drop Area */}
-        <div
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-6 bg-gray-50 hover:bg-gray-100 cursor-pointer"
-        >
-          <p className="text-gray-500">Dateien hierher ziehen oder klicken zum Hochladen</p>
-          <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" multiple />
-          <Button onClick={handleFileSelectClick} className="mt-4 bg-gray-600 hover:bg-gray-700">
+      <div onDragOver={handleDragOver} onDrop={handleDrop}>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-semibold">Dokumenten- und Zahlungsverwaltung</h3>
+          <Button onClick={handleFileSelectClick} className="bg-gray-600 hover:bg-gray-700">
             Dateien auswählen
           </Button>
+          <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" multiple />
         </div>
 
         {/* Documents Table */}
-        <div className="overflow-x-auto">
-          <table className="min-w-full table-auto border">
+        <div className="overflow-x-auto border-2 border-dashed border-gray-300 rounded-lg">
+          <table className="min-w-full table-auto">
             <thead className="bg-gray-200">
               <tr>
-                <th className="px-4 py-2 border">Datum</th>
-                <th className="px-4 py-2 border">Beschreibung</th>
-                <th className="px-4 py-2 border">Format</th>
-                <th className="px-4 py-2 border text-right">Soll</th>
-                <th className="px-4 py-2 border text-right">Haben</th>
+                <th className="px-4 py-2 border-b">Datum</th>
+                <th className="px-4 py-2 border-b">Beschreibung</th>
+                <th className="px-4 py-2 border-b">Format</th>
+                <th className="px-4 py-2 border-b text-right">Soll</th>
+                <th className="px-4 py-2 border-b text-right">Haben</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y">
-              {(record.dokumente || []).map((doc, index) => (
-                <tr key={index} onDoubleClick={() => handleDocDoubleClick(doc)} className="hover:bg-gray-50 cursor-pointer">
-                  <td className="px-4 py-2 border">{doc.datum}</td>
-                  <td className="px-4 py-2 border">{doc.beschreibung}</td>
-                  <td className="px-4 py-2 border">{doc.format}</td>
-                  <td className="px-4 py-2 border text-right">{doc.soll?.toFixed(2)} €</td>
-                  <td className="px-4 py-2 border text-right">{doc.haben?.toFixed(2)} €</td>
+            <tbody className="bg-white">
+              {(record.dokumente || []).length > 0 ? (
+                (record.dokumente || []).map((doc, index) => (
+                  <tr key={index} onDoubleClick={() => handleDocDoubleClick(doc)} className="hover:bg-gray-50 cursor-pointer">
+                    <td className="px-4 py-2 border-b">{formatDate(doc.datum)}</td>
+                    <td className="px-4 py-2 border-b">{doc.beschreibung}</td>
+                    <td className="px-4 py-2 border-b">{simplifyFormat(doc)}</td>
+                    <td className="px-4 py-2 border-b text-right">{doc.soll?.toFixed(2)} €</td>
+                    <td className="px-4 py-2 border-b text-right">{doc.haben?.toFixed(2)} €</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="5" className="text-center py-12 text-gray-500">
+                    Ziehen Sie Dateien hierher oder nutzen Sie den Button zum Hochladen.
+                  </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

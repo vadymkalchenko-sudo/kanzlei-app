@@ -14,7 +14,7 @@ export const App = () => {
     records,
     dritteBeteiligte,
     message,
-    setMessage,
+    setFlashMessage,
     handleRecordSubmit,
     handleMandantSubmit,
     handleDeleteMandant,
@@ -43,7 +43,7 @@ export const App = () => {
 
   // Schließt die Meldungsanzeige
   const handleCloseMessage = () => {
-    setMessage(null);
+    setFlashMessage(null);
   };
   
   const handleOpenAkteModal = (akte = null) => {
@@ -99,6 +99,16 @@ export const App = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Keep selectedItem in sync with the main records list
+  useEffect(() => {
+    if (selectedItem) {
+      const updatedRecord = records.find(r => r.id === selectedItem.id);
+      if (updatedRecord) {
+        setSelectedItem(updatedRecord);
+      }
+    }
+  }, [records]);
 
   return (
     <div className="bg-gray-100 min-h-screen p-8 font-sans antialiased text-gray-800">
