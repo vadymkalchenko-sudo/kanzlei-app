@@ -240,6 +240,7 @@ export const App = () => {
               nextCaseNumber={nextCaseNumber}
               onNavigateToStammdaten={navigateToStammdaten}
               handleDritteSubmit={handleDritteSubmit}
+              handleMandantSubmit={handleMandantSubmit}
             />
           )}
         </Modal>
