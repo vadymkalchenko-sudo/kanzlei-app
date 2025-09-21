@@ -93,6 +93,7 @@ export const useKanzleiLogic = () => {
       }
 
       const newDocuments = Array.from(files).map(file => ({
+        id: `doc_${new Date().getTime()}_${Math.random()}`,
         datum: new Date().toISOString().split('T')[0],
         beschreibung: file.name,
         format: file.type || 'Unbekannt',
@@ -132,6 +133,46 @@ export const useKanzleiLogic = () => {
       fetchData(); // Daten neu laden
     } catch (error) {
       setFlashMessage(`Fehler: ${error.message}`);
+    }
+  };
+
+  const handleUpdateDocument = async (recordId, documentId, updatedDocData) => {
+    try {
+      const recordToUpdate = records.find(r => r.id === recordId);
+      if (!recordToUpdate) {
+        throw new Error('Akte nicht gefunden');
+      }
+
+      const updatedDocuments = recordToUpdate.dokumente.map(doc =>
+        doc.id === documentId ? { ...doc, ...updatedDocData } : doc
+      );
+
+      const updatedRecord = { ...recordToUpdate, dokumente: updatedDocuments };
+      await api.updateRecord(recordId, updatedRecord);
+      setFlashMessage('Dokument erfolgreich aktualisiert.');
+      fetchData();
+    } catch (error) {
+      setFlashMessage(`Fehler beim Aktualisieren des Dokuments: ${error.message}`);
+    }
+  };
+
+  const handleDeleteDocument = async (recordId, documentId) => {
+    try {
+      const recordToUpdate = records.find(r => r.id === recordId);
+      if (!recordToUpdate) {
+        throw new Error('Akte nicht gefunden');
+      }
+
+      const updatedRecord = {
+        ...recordToUpdate,
+        dokumente: recordToUpdate.dokumente.filter(d => d.id !== documentId),
+      };
+
+      await api.updateRecord(recordId, updatedRecord);
+      setFlashMessage('Dokument erfolgreich gelöscht.');
+      fetchData();
+    } catch (error) {
+      setFlashMessage(`Fehler beim Löschen des Dokuments: ${error.message}`);
     }
   };
 
@@ -272,6 +313,8 @@ export const useKanzleiLogic = () => {
     handleRecordSubmit,
     handleDeleteRecord,
     handleAddDocuments,
+    handleUpdateDocument,
+    handleDeleteDocument,
     fetchData,
     handleExport,
     handleImport,
