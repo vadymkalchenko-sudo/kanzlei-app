@@ -88,9 +88,7 @@ export const useKanzleiLogic = () => {
   const handleAddDocuments = async (recordId, files) => {
     try {
       const recordToUpdate = records.find(r => r.id === recordId);
-      if (!recordToUpdate) {
-        throw new Error('Akte nicht gefunden');
-      }
+      if (!recordToUpdate) throw new Error('Akte nicht gefunden');
 
       const newDocuments = Array.from(files).map(file => ({
         id: `doc_${new Date().getTime()}_${Math.random()}`,
@@ -101,12 +99,9 @@ export const useKanzleiLogic = () => {
         haben: 0,
       }));
 
-      const updatedRecord = {
-        ...recordToUpdate,
-        dokumente: [...(recordToUpdate.dokumente || []), ...newDocuments],
-      };
+      const updatedDokumente = [...(recordToUpdate.dokumente || []), ...newDocuments];
 
-      await api.updateRecord(recordId, updatedRecord);
+      await api.updateRecord(recordId, { dokumente: updatedDokumente });
       setFlashMessage(`${files.length} Dokument(e) erfolgreich hinzugefügt.`);
       fetchData();
     } catch (error) {
@@ -147,8 +142,7 @@ export const useKanzleiLogic = () => {
         doc.id === documentId ? { ...doc, ...updatedDocData } : doc
       );
 
-      const updatedRecord = { ...recordToUpdate, dokumente: updatedDocuments };
-      await api.updateRecord(recordId, updatedRecord);
+      await api.updateRecord(recordId, { dokumente: updatedDocuments });
       setFlashMessage('Dokument erfolgreich aktualisiert.');
       fetchData();
     } catch (error) {
