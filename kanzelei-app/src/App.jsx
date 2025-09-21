@@ -21,6 +21,8 @@ export const App = () => {
     handleDritteSubmit,
     handleDeleteDritte,
     handleAddDocuments,
+    handleUpdateDocument,
+    handleDeleteDocument,
     handleExport,
     handleImport,
     nextCaseNumber,
@@ -224,6 +226,8 @@ export const App = () => {
               onGoBack={handleGoBackToList}
               onDirectEdit={handleDirectEdit}
               onAddDocuments={handleAddDocuments}
+              onDeleteDocument={handleDeleteDocument}
+              onUpdateDocument={handleUpdateDocument}
             />
           )}
         </main>
