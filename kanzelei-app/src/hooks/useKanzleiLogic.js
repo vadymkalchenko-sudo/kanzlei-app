@@ -73,13 +73,16 @@ export const useKanzleiLogic = () => {
         await api.updateMandant(mandantData.id, mandantData);
         setFlashMessage('Mandant erfolgreich aktualisiert!');
       } else {
-        await api.createMandant(mandantData);
+        const newMandant = await api.createMandant(mandantData);
         setFlashMessage('Neuer Mandant erfolgreich angelegt!');
+        fetchData(); // Fetch before returning to ensure lists are up-to-date
+        return newMandant;
       }
       fetchData(); // Daten neu laden
     } catch (error) {
       setFlashMessage(`Fehler: ${error.message}`);
     }
+    return null;
   };
 
   const handleAddDocuments = async (recordId, files) => {

@@ -11,7 +11,8 @@ export const Aktenansicht = ({ record, mandant, onGoBack, onDirectEdit, onAddDoc
   const handleDrop = (e) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      onAddDocuments(record.id, e.dataTransfer.files);
+      const files = Array.from(e.dataTransfer.files);
+      onAddDocuments(record.id, files);
       e.dataTransfer.clearData();
     }
   };
@@ -22,7 +23,8 @@ export const Aktenansicht = ({ record, mandant, onGoBack, onDirectEdit, onAddDoc
 
   const handleFileSelected = (e) => {
     if (e.target.files && e.target.files.length > 0) {
-      onAddDocuments(record.id, e.target.files);
+      const files = Array.from(e.target.files);
+      onAddDocuments(record.id, files);
     }
   };
   if (!record || !mandant) {
@@ -35,7 +37,16 @@ export const Aktenansicht = ({ record, mandant, onGoBack, onDirectEdit, onAddDoc
   }
 
   const handleDocDoubleClick = (doc) => {
-    alert(`Dokument "${doc.beschreibung}" wird geöffnet... (Simulation)`);
+    // Simulate file download
+    const blob = new Blob([`Inhalt für Dokument: ${doc.beschreibung}`], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = doc.beschreibung || 'dokument.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const formatDate = (dateString) => {
@@ -78,7 +89,18 @@ export const Aktenansicht = ({ record, mandant, onGoBack, onDirectEdit, onAddDoc
           <p>{mandant.email}</p>
         </div>
         <div className="bg-gray-50 p-4 rounded-lg">
-          <h3 className="font-bold text-lg mb-2">Gegner</h3>
+          <h3 className="font-bold text-lg mb-2 flex items-center">
+            Gegner
+            <button
+              disabled
+              className="ml-2 p-1 text-gray-400 cursor-not-allowed"
+              title="Gegner müssen zuerst als 'Dritter Beteiligter' in den Stammdaten angelegt werden, um sie hier zu verknüpfen und zu bearbeiten."
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" />
+              </svg>
+            </button>
+          </h3>
           <p>{record.gegner || 'N/A'}</p>
           <p>Kennzeichen: {record.gegnerKennzeichen || 'N/A'}</p>
         </div>
