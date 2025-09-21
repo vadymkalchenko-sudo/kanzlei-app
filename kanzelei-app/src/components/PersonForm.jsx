@@ -71,7 +71,7 @@ const PersonForm = ({ person, onSubmit, onCancel, title }) => {
         <Button type="button" onClick={onCancel} className="bg-gray-300 hover:bg-gray-400 text-gray-800">
           Abbrechen
         </Button>
-        <Button type="submit">
+        <Button type="button" onClick={handleSubmit}>
           Speichern
         </Button>
       </div>

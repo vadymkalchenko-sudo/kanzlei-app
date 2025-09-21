@@ -143,13 +143,20 @@ export const createRecord = async (recordData) => {
   return Promise.resolve(newRecord);
 };
 
-export const updateRecord = async (recordId, recordData) => {
+export const updateRecord = async (recordId, partialRecordData) => {
   // Mock implementation
-  console.log('API: updateRecord called with', recordId, recordData);
+  console.log('API: updateRecord called with', recordId, partialRecordData);
   let records = JSON.parse(localStorage.getItem('records')) || [];
-  records = records.map(r => r.id === recordId ? { ...r, ...recordData } : r);
+  let updatedRecord = null;
+  records = records.map(r => {
+    if (r.id === recordId) {
+      updatedRecord = { ...r, ...partialRecordData };
+      return updatedRecord;
+    }
+    return r;
+  });
   localStorage.setItem('records', JSON.stringify(records));
-  return Promise.resolve({ ...recordData, id: recordId });
+  return Promise.resolve(updatedRecord);
 };
 
 export const deleteRecord = async (recordId) => {

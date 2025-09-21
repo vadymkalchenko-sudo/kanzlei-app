@@ -43,6 +43,19 @@ export const Aktenansicht = ({ record, mandant, onGoBack, onDirectEdit, onAddDoc
     handleCloseEditModal();
   };
 
+  const handleOpenDocument = (doc) => {
+    // Simulate file download
+    const blob = new Blob([`Inhalt für Dokument: ${doc.beschreibung}`], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = doc.beschreibung || 'dokument.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   if (!record || !mandant) {
     return (
       <div>
@@ -116,20 +129,25 @@ export const Aktenansicht = ({ record, mandant, onGoBack, onDirectEdit, onAddDoc
                 <th className="px-4 py-2 border-b">Format</th>
                 <th className="px-4 py-2 border-b text-right">Soll</th>
                 <th className="px-4 py-2 border-b text-right">Haben</th>
-                <th className="px-4 py-2 border-b">Aktionen</th>
+                <th className="px-4 py-2 border-b text-center">Aktionen</th>
               </tr>
             </thead>
             <tbody className="bg-white">
               {(record.dokumente || []).length > 0 ? (
                 (record.dokumente || []).map((doc) => (
-                  <tr key={doc.id} onDoubleClick={() => handleOpenEditModal(doc)} className="hover:bg-gray-50 cursor-pointer">
+                  <tr key={doc.id} onDoubleClick={() => handleOpenDocument(doc)} className="hover:bg-gray-50 cursor-pointer">
                     <td className="px-4 py-2 border-b">{formatDate(doc.datum)}</td>
                     <td className="px-4 py-2 border-b">{doc.beschreibung}</td>
                     <td className="px-4 py-2 border-b">{simplifyFormat(doc)}</td>
                     <td className="px-4 py-2 border-b text-right">{doc.soll?.toFixed(2)} €</td>
                     <td className="px-4 py-2 border-b text-right">{doc.haben?.toFixed(2)} €</td>
-                    <td className="px-4 py-2 border-b">
-                      <Button onClick={(e) => { e.stopPropagation(); onDeleteDocument(record.id, doc.id); }} className="bg-red-600 hover:bg-red-700 text-white text-xs py-1 px-2">Löschen</Button>
+                    <td className="px-4 py-2 border-b text-center">
+                      <button onClick={(e) => { e.stopPropagation(); handleOpenEditModal(doc); }} className="p-1 text-blue-600 hover:text-blue-800" title="Bearbeiten">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); onDeleteDocument(record.id, doc.id); }} className="p-1 text-red-600 hover:text-red-800 ml-2" title="Löschen">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
                     </td>
                   </tr>
                 ))
