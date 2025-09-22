@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import * as api from '../api';
+import { readFileAsBase64 } from '../utils';
 
 // Generiert eine neue Aktennummer im Format [Laufende Nummer].[Zweistelliges Jahr].awr
 const generateNewCaseNumber = (totalRecords) => {
@@ -67,22 +68,25 @@ export const useKanzleiLogic = () => {
     fetchData();
   }, [fetchData]);
 
-  const handleMandantSubmit = async (mandantData) => {
+  const handleMandantSubmit = async (mandantData, options = { showMessage: true, fetchData: true }) => {
     try {
+      let newMandant = null;
       if (mandantData.id) {
-        await api.updateMandant(mandantData.id, mandantData);
-        setFlashMessage('Mandant erfolgreich aktualisiert!');
+        newMandant = await api.updateMandant(mandantData.id, mandantData);
+        if (options.showMessage) setFlashMessage('Mandant erfolgreich aktualisiert!');
       } else {
-        const newMandant = await api.createMandant(mandantData);
-        setFlashMessage('Neuer Mandant erfolgreich angelegt!');
-        fetchData(); // Fetch before returning to ensure lists are up-to-date
-        return newMandant;
+        newMandant = await api.createMandant(mandantData);
+        if (options.showMessage) setFlashMessage('Neuer Mandant erfolgreich angelegt!');
       }
-      fetchData(); // Daten neu laden
+
+      if (options.fetchData) {
+        fetchData();
+      }
+      return newMandant;
     } catch (error) {
       setFlashMessage(`Fehler: ${error.message}`);
+      return null;
     }
-    return null;
   };
 
   const handleAddDocuments = async (recordId, files) => {
@@ -90,16 +94,23 @@ export const useKanzleiLogic = () => {
       const recordToUpdate = records.find(r => r.id === recordId);
       if (!recordToUpdate) throw new Error('Akte nicht gefunden');
 
-      const newDocuments = Array.from(files).map(file => ({
-        id: `doc_${new Date().getTime()}_${Math.random()}`,
-        datum: new Date().toISOString().split('T')[0],
-        beschreibung: file.name,
-        format: file.type || 'Unbekannt',
-        soll: 0,
-        haben: 0,
+      // Create a deep copy to avoid any potential mutation of the original state object
+      const clonedRecord = JSON.parse(JSON.stringify(recordToUpdate));
+
+      const newDocuments = await Promise.all(Array.from(files).map(async (file) => {
+        const content = await readFileAsBase64(file);
+        return {
+          id: `doc_${new Date().getTime()}_${Math.random()}`,
+          datum: new Date().toISOString().split('T')[0],
+          beschreibung: file.name,
+          format: file.type || 'Unbekannt',
+          content: content,
+          soll: 0,
+          haben: 0,
+        };
       }));
 
-      const updatedDokumente = [...(recordToUpdate.dokumente || []), ...newDocuments];
+      const updatedDokumente = [...(clonedRecord.dokumente || []), ...newDocuments];
 
       await api.updateRecord(recordId, { dokumente: updatedDokumente });
       setFlashMessage(`${files.length} Dokument(e) erfolgreich hinzugefügt.`);
@@ -157,12 +168,9 @@ export const useKanzleiLogic = () => {
         throw new Error('Akte nicht gefunden');
       }
 
-      const updatedRecord = {
-        ...recordToUpdate,
-        dokumente: recordToUpdate.dokumente.filter(d => d.id !== documentId),
-      };
+      const updatedDokumente = recordToUpdate.dokumente.filter(d => d.id !== documentId);
 
-      await api.updateRecord(recordId, updatedRecord);
+      await api.updateRecord(recordId, { dokumente: updatedDokumente });
       setFlashMessage('Dokument erfolgreich gelöscht.');
       fetchData();
     } catch (error) {
@@ -175,13 +183,17 @@ export const useKanzleiLogic = () => {
       if (data.id) {
         await api.updateDritteBeteiligte(data.id, data);
         setFlashMessage('Dritter Beteiligter erfolgreich aktualisiert!');
+        fetchData();
+        return null; // Or the updated data
       } else {
-        await api.createDritteBeteiligte(data);
+        const newItem = await api.createDritteBeteiligte(data);
         setFlashMessage('Neuer Dritter Beteiligter erfolgreich angelegt!');
+        fetchData();
+        return newItem; // Return the new item
       }
-      fetchData();
     } catch (error) {
       setFlashMessage(`Fehler: ${error.message}`);
+      return null;
     }
   };
 
@@ -199,55 +211,47 @@ export const useKanzleiLogic = () => {
 
   const handleRecordSubmit = async (formData) => {
     try {
-      let messageText = '';
+      const { clientJustCreated, ...recordFormData } = formData;
       const {
-        id, isNewMandant, mandantId,
-        anrede, vorname, nachname, strasse, hausnummer, plz, stadt, email, telefon, iban, notizen,
-        status, gegner, unfallDatum, kennzeichen, mdtKennzeichen, gegnerKennzeichen
-      } = formData;
+        id, mandantId, status, gegnerId, unfallDatum, kennzeichen,
+        mdtKennzeichen, gegnerKennzeichen, sonstigeBeteiligte, beteiligteDritte
+      } = recordFormData;
 
-      const name = `${vorname} ${nachname}`.trim();
-      const mandantData = { anrede, name, strasse, hausnummer, plz, stadt, email, telefon, iban, notizen };
-      const recordCoreData = { status, gegner, schadenDatum: unfallDatum, kennzeichen, mdtKennzeichen, gegnerKennzeichen };
-      let finalMandantId = mandantId;
-
-      if (isNewMandant) {
-        const newMandant = await api.createMandant(mandantData);
-        finalMandantId = newMandant.id;
-        messageText += 'Neuer Mandant wurde angelegt. ';
-      } else if (mandantId) {
-        const originalMandant = mandanten.find(m => m.id === mandantId);
-        const updatedMandantData = { ...originalMandant, ...mandantData };
-        const hasChanged = Object.keys(mandantData).some(key => (originalMandant[key] || '') !== (updatedMandantData[key] || ''));
-        if (hasChanged) {
-          if (window.confirm("Die Mandantendaten wurden geändert. Möchten Sie den bestehenden Mandanten aktualisieren?\n\n'OK' = Aktualisieren, 'Abbrechen' = Neuen Mandant anlegen.")) {
-            await api.updateMandant(mandantId, updatedMandantData);
-            messageText += 'Mandantendaten wurden aktualisiert. ';
-          } else {
-            const newMandant = await api.createMandant(mandantData);
-            finalMandantId = newMandant.id;
-            messageText += 'Ein neuer Mandant wurde mit den geänderten Daten angelegt. ';
-          }
-        }
+      if (!mandantId) {
+        throw new Error("Cannot submit record without a client (mandantId).");
       }
+
+      const recordData = {
+        mandantId,
+        status,
+        gegnerId,
+        schadenDatum: unfallDatum,
+        kennzeichen,
+        mdtKennzeichen,
+        gegnerKennzeichen,
+        sonstigeBeteiligte,
+        beteiligteDritte,
+      };
 
       if (id) {
-        const recordData = { ...recordCoreData, mandantId: finalMandantId };
         const originalRecord = records.find(r => r.id === id);
         if (recordData.status === 'geschlossen' && originalRecord?.status !== 'geschlossen') {
-          const clientForArchiving = mandanten.find(m => m.id === finalMandantId);
-          recordData.archivedMandantData = { ...clientForArchiving, ...mandantData };
-          messageText += 'Akte wurde geschlossen und Mandantendaten archiviert. ';
+          const clientForArchiving = mandanten.find(m => m.id === mandantId);
+          recordData.archivedMandantData = { ...clientForArchiving };
+          setFlashMessage('Akte wurde geschlossen und Mandantendaten archiviert.');
         }
         await api.updateRecord(id, recordData);
-        messageText += 'Akte erfolgreich aktualisiert!';
+        setFlashMessage('Akte erfolgreich aktualisiert!');
       } else {
-        const newRecord = { ...recordCoreData, mandantId: finalMandantId, caseNumber: nextCaseNumber };
+        const newRecord = { ...recordData, caseNumber: nextCaseNumber };
         await api.createRecord(newRecord);
-        messageText += 'Neue Akte erfolgreich angelegt!';
+        if (clientJustCreated) {
+          setFlashMessage('Neuer Mandant und Akte erfolgreich angelegt!');
+        } else {
+          setFlashMessage('Neue Akte erfolgreich angelegt!');
+        }
       }
 
-      setFlashMessage(messageText);
       fetchData();
     } catch (error) {
       setFlashMessage(`Fehler: ${error.message}`);
