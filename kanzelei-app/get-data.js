@@ -1,7 +1,9 @@
 require('dotenv').config();
 const express = require('express');
-const { Pool } = require('pg');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const port = 3001;
@@ -9,85 +11,75 @@ const port = 3001;
 app.use(cors({ origin: 'http://localhost:3000' }));
 app.use(express.json());
 
-// The pool is initialized as null and will be created on demand.
-let pool = null;
+const basePath = process.env.STORAGE_PATH || path.join(__dirname, 'kanzlei-data');
+console.log('Anwendung versucht zu schreiben in:', basePath);
 
-// Middleware to check if the database is connected
-const checkDbConnected = (req, res, next) => {
-  if (pool === null) {
-    return res.status(503).json({ error: 'Datenbankverbindung nicht hergestellt. Bitte zuerst verbinden.' });
-  }
-  next();
+const initializeStorage = (req, res, next) => {
+    const directories = ['records', 'mandanten', 'dritte-beteiligte'];
+    directories.forEach(dir => {
+        const fullPath = path.join(basePath, dir);
+        try {
+            if (!fs.existsSync(fullPath)) {
+                fs.mkdirSync(fullPath, { recursive: true });
+                console.log(`Ordner '${fullPath}' wurde erstellt.`);
+            }
+        } catch (error) {
+            console.error(`Fehler beim Erstellen des Ordners '${fullPath}':`, error);
+        }
+    });
+    next();
 };
 
-// Endpoint to create the database connection
-app.post('/api/db-connect', async (req, res) => {
-  if (pool) {
-    return res.status(200).json({ status: 'ok', message: 'Verbindung besteht bereits.' });
-  }
+app.use(initializeStorage);
 
-  try {
-    const dbConfig = {
-      user: process.env.DB_USER,
-      host: process.env.DB_HOST,
-      database: process.env.DB_DATABASE,
-      password: process.env.DB_PASSWORD,
-      port: process.env.DB_PORT,
-      connectionTimeoutMillis: 5000,
-    };
+// Generische CRUD-Fabrik für alle Entitäten (Records, Mandanten, Dritte Beteiligte)
+const createCrudEndpoints = (router, storageDir, entityName) => {
+    // POST create
+    router.post('/', (req, res) => {
+        try {
+            const newItem = req.body;
+            newItem.id = crypto.randomUUID();
+            const filePath = path.join(storageDir, `${newItem.id}.json`);
+            fs.writeFileSync(filePath, JSON.stringify(newItem, null, 2), 'utf-8');
+            console.log(`${entityName} erfolgreich erstellt: ${filePath}`);
+            res.status(201).json(newItem);
+        } catch (err) {
+            console.error(`Fehler beim Erstellen von ${entityName}:`, err);
+            res.status(500).json({ error: `Fehler beim Erstellen von ${entityName}`, details: err.message });
+        }
+    });
 
-    pool = new Pool(dbConfig);
+    // GET all
+    router.get('/', (req, res) => {
+        try {
+            const files = fs.readdirSync(storageDir).filter(file => file.endsWith('.json'));
+            const items = files.map(file => {
+                const filePath = path.join(storageDir, file);
+                return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+            });
+            res.json(items);
+        } catch (err) {
+            console.error(`Fehler beim Lesen der ${entityName}:`, err);
+            res.status(500).json({ error: `Fehler beim Lesen der ${entityName}` });
+        }
+    });
 
-    const client = await pool.connect();
-    await client.query('SELECT 1');
-    client.release();
+    // ... weitere Endpunkte wie PUT und DELETE können hier hinzugefügt werden
+};
 
-    res.json({ status: 'ok', message: 'Verbindung erfolgreich hergestellt.' });
-  } catch (err) {
-    // If connection fails, reset the pool to null
-    pool = null;
-    console.error('Database connection failed:', err);
-    res.status(500).json({ status: 'error', message: 'Verbindungsfehler', error: err.message });
-  }
-});
+// Erstelle Router für jeden Entitätstyp
+const recordsRouter = express.Router();
+createCrudEndpoints(recordsRouter, path.join(basePath, 'records'), 'Akte');
+app.use('/api/records', recordsRouter);
 
-// Endpoint to check the status of the connection
-app.get('/api/db-status', async (req, res) => {
-  if (pool === null) {
-    return res.json({ status: 'disconnected', message: 'Keine Verbindung.' });
-  }
+const mandantenRouter = express.Router();
+createCrudEndpoints(mandantenRouter, path.join(basePath, 'mandanten'), 'Mandant');
+app.use('/api/mandanten', mandantenRouter);
 
-  let client;
-  try {
-    client = await pool.connect();
-    await client.query('SELECT 1');
-    res.json({ status: 'ok', message: 'Verbindung aktiv.' });
-  } catch (err) {
-    // If the check fails, assume the connection is lost and reset the pool
-    pool = null;
-    console.error('Database status check failed:', err);
-    res.status(500).json({ status: 'error', message: 'Verbindung verloren.', error: err.message });
-  } finally {
-    if (client) client.release();
-  }
-});
-
-
-// Existing endpoint, now protected by the connection check middleware
-app.get('/api/kanzlei-daten', checkDbConnected, async (req, res) => {
-  let client;
-  try {
-    client = await pool.connect();
-    const result = await client.query('SELECT * FROM kanzlei_daten', []);
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Error fetching kanzlei-daten:', err);
-    res.status(500).json({ error: 'Interner Serverfehler' });
-  } finally {
-    if (client) client.release();
-  }
-});
+const dritteRouter = express.Router();
+createCrudEndpoints(dritteRouter, path.join(basePath, 'dritte-beteiligte'), 'Dritter Beteiligter');
+app.use('/api/dritte-beteiligte', dritteRouter);
 
 app.listen(port, () => {
-  console.log(`API-Server läuft auf http://localhost:${port}`);
+    console.log(`API-Server läuft auf http://localhost:${port}`);
 });
