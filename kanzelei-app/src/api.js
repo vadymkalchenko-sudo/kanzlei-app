@@ -182,3 +182,13 @@ export const importData = async (data) => {
   localStorage.setItem('records', JSON.stringify(data.records || []));
   return Promise.resolve({ message: 'Daten erfolgreich importiert' });
 };
+
+export const connectDb = async () => {
+  const response = await fetch(`${API_URL}/db-connect`, { method: 'POST' });
+  return handleResponse(response);
+};
+
+export const getDbStatus = async () => {
+  const response = await fetch(`${API_URL}/db-status`);
+  return handleResponse(response);
+};
