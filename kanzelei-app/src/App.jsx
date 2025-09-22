@@ -223,6 +223,7 @@ export const App = () => {
             <Aktenansicht
               record={selectedItem}
               mandant={mandanten.find(m => m.id === selectedItem.mandantId)}
+              dritteBeteiligte={dritteBeteiligte}
               onGoBack={handleGoBackToList}
               onDirectEdit={handleDirectEdit}
               onAddDocuments={handleAddDocuments}
@@ -239,7 +240,7 @@ export const App = () => {
               akte={selectedItem}
               mandanten={mandanten}
               dritteBeteiligte={dritteBeteiligte}
-              onSubmit={handleRecordSubmit}
+              onRecordSubmit={handleRecordSubmit}
               onCancel={handleCloseModal}
               nextCaseNumber={nextCaseNumber}
               onNavigateToStammdaten={navigateToStammdaten}

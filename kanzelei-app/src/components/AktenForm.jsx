@@ -18,7 +18,7 @@ const initialFormData = {
   mdtKennzeichen: '',
   gegnerKennzeichen: '',
   unfallDatum: '',
-  gegner: '',
+  gegnerId: '',
   status: 'offen',
   kennzeichen: '',
   sonstigeBeteiligte: '',
@@ -26,7 +26,7 @@ const initialFormData = {
   mandantId: '',
 };
 
-export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onSubmit, onCancel, nextCaseNumber, handleDritteSubmit, handleMandantSubmit }) => {
+export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, onCancel, nextCaseNumber, handleDritteSubmit, handleMandantSubmit }) => {
   const [formData, setFormData] = useState({ ...initialFormData, ...akte });
   const [isNewMandant, setIsNewMandant] = useState(!akte?.mandantId);
   const [errors, setErrors] = useState({});
@@ -36,6 +36,7 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onSubmit, onCance
   const [isBeteiligteOpen, setIsBeteiligteOpen] = useState(false);
   const [isAddBeteiligteModalOpen, setIsAddBeteiligteModalOpen] = useState(false);
   const [isAddMandantModalOpen, setIsAddMandantModalOpen] = useState(false);
+  const [isAddGegnerModalOpen, setIsAddGegnerModalOpen] = useState(false);
 
   useEffect(() => {
     if (akte && akte.beteiligteDritte && dritteBeteiligte?.length > 0) {
@@ -53,7 +54,7 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onSubmit, onCance
       const mandant = mandanten.find(m => m.id === akte.mandantId);
       if (mandant) {
         setFormData(prev => ({
-          ...prev, ...mandant, status: akte.status, gegner: akte.gegner,
+          ...prev, ...mandant, status: akte.status, gegnerId: akte.gegnerId,
           unfallDatum: akte.schadenDatum, kennzeichen: akte.kennzeichen,
           sonstigeBeteiligte: akte.sonstigeBeteiligte || '',
         }));
@@ -94,19 +95,45 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onSubmit, onCance
     setIsAddBeteiligteModalOpen(false);
   };
 
-  const handleAddMandantSubmit = async (personData) => {
-    const newMandant = await handleMandantSubmit(personData);
-    if (newMandant) {
-      setIsNewMandant(false);
-      setFormData(prev => ({ ...prev, mandantId: newMandant.id }));
+  const handleAddGegnerSubmit = async (personData) => {
+    const newGegner = await handleDritteSubmit(personData);
+    if (newGegner) {
+      setFormData(prev => ({ ...prev, gegnerId: newGegner.id }));
     }
+    setIsAddGegnerModalOpen(false);
+  };
+
+  const handleAddMandantSubmit = (personData) => {
+    setFormData(prev => ({ ...prev, ...personData }));
     setIsAddMandantModalOpen(false);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit({ ...formData, isNewMandant: false, status: akte ? formData.status : 'offen' });
-    onCancel();
+    try {
+      let submissionData = { ...formData };
+      let clientJustCreated = false;
+
+      if (isNewMandant) {
+        const { anrede, vorname, nachname, strasse, hausnummer, plz, stadt, email, telefon, iban, notizen } = formData;
+        const name = `${vorname} ${nachname}`.trim();
+        const mandantData = { anrede, name, strasse, hausnummer, plz, stadt, email, telefon, iban, notizen };
+
+        const newMandant = await handleMandantSubmit(mandantData, { showMessage: false, fetchData: false });
+        if (newMandant && newMandant.id) {
+          submissionData.mandantId = newMandant.id;
+          clientJustCreated = true;
+        } else {
+          console.error("Failed to create new client.");
+          return;
+        }
+      }
+
+      onRecordSubmit({ ...submissionData, clientJustCreated, status: akte ? formData.status : 'offen' });
+      onCancel();
+    } catch (error) {
+      console.error("Error during form submission:", error);
+    }
   };
 
   const filteredDritte = dritteSearch ? (dritteBeteiligte || []).filter(d =>
@@ -157,7 +184,28 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onSubmit, onCance
                 className="input-field w-full text-gray-500"
               />
             </div>
-            <input type="text" name="gegner" value={formData.gegner} onChange={handleChange} placeholder="Gegner Name" className="input-field w-full" />
+            <div>
+              <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="gegnerId">Gegner (aus Stammdaten)</label>
+              <div className="flex items-center gap-2">
+                <select
+                  name="gegnerId"
+                  id="gegnerId"
+                  value={formData.gegnerId}
+                  onChange={handleChange}
+                  className="input-field w-full"
+                >
+                  <option value="">Bitte wählen...</option>
+                  {(dritteBeteiligte || []).map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+                <Button type="button" onClick={() => setIsAddGegnerModalOpen(true)} className="flex-shrink-0">
+                  +
+                </Button>
+              </div>
+            </div>
             <input type="text" name="kennzeichen" value={formData.kennzeichen} onChange={handleChange} placeholder="Kennzeichen" className="input-field w-full" />
             {akte && (
               <div className="pt-2">
@@ -220,6 +268,10 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onSubmit, onCance
 
       <Modal isOpen={isAddMandantModalOpen} onClose={() => setIsAddMandantModalOpen(false)}>
         <PersonForm onSubmit={handleAddMandantSubmit} onCancel={() => setIsAddMandantModalOpen(false)} title="Neuen Mandant anlegen" />
+      </Modal>
+
+      <Modal isOpen={isAddGegnerModalOpen} onClose={() => setIsAddGegnerModalOpen(false)}>
+        <PersonForm onSubmit={handleAddGegnerSubmit} onCancel={() => setIsAddGegnerModalOpen(false)} title="Neuen Gegner anlegen" />
       </Modal>
     </form>
   );

@@ -3,7 +3,7 @@ import { Button } from './ui/Button.jsx';
 import { Modal } from './ui/Modal.jsx';
 import DocumentForm from './DocumentForm.jsx';
 
-export const Aktenansicht = ({ record, mandant, onGoBack, onDirectEdit, onAddDocuments, onDeleteDocument, onUpdateDocument }) => {
+export const Aktenansicht = ({ record, mandant, dritteBeteiligte, onGoBack, onDirectEdit, onAddDocuments, onDeleteDocument, onUpdateDocument }) => {
   const fileInputRef = useRef(null);
   const [isEditDocModalOpen, setIsEditDocModalOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
@@ -43,13 +43,26 @@ export const Aktenansicht = ({ record, mandant, onGoBack, onDirectEdit, onAddDoc
     handleCloseEditModal();
   };
 
+  const base64ToBlob = (base64, mimeType) => {
+    const byteCharacters = atob(base64.split(',')[1]);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: mimeType });
+  };
+
   const handleOpenDocument = (doc) => {
-    // Simulate file download
-    const blob = new Blob([`Inhalt für Dokument: ${doc.beschreibung}`], { type: 'text/plain' });
+    if (!doc.content) {
+      alert('Dokumenteninhalt nicht gefunden. Die Datei wurde möglicherweise vor der Inhalts-Speicherung hochgeladen.');
+      return;
+    }
+    const blob = base64ToBlob(doc.content, doc.format);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = doc.beschreibung || 'dokument.txt';
+    a.download = doc.beschreibung || 'dokument';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -76,6 +89,10 @@ export const Aktenansicht = ({ record, mandant, onGoBack, onDirectEdit, onAddDoc
     return extension === doc.beschreibung.toLowerCase() ? (doc.format || 'Unbekannt') : extension;
   };
 
+  const gegner = record.gegnerId && dritteBeteiligte
+    ? dritteBeteiligte.find(d => d.id === record.gegnerId)
+    : null;
+
   return (
     <div className="p-4 bg-white rounded-lg shadow-md">
       {/* Header */}
@@ -100,11 +117,21 @@ export const Aktenansicht = ({ record, mandant, onGoBack, onDirectEdit, onAddDoc
         <div className="bg-gray-50 p-4 rounded-lg">
           <h3 className="font-bold text-lg mb-2 flex items-center">
             Gegner
-            <button disabled className="ml-2 p-1 text-gray-400 cursor-not-allowed" title="Gegner müssen zuerst als 'Dritter Beteiligter' in den Stammdaten angelegt werden, um sie hier zu verknüpfen und zu bearbeiten.">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
-            </button>
+            {gegner && (
+              <button onClick={() => onDirectEdit(gegner, 'dritte')} className="ml-2 p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-full">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
+              </button>
+            )}
           </h3>
-          <p>{record.gegner || 'N/A'}</p>
+          {gegner ? (
+            <div>
+              <p>{gegner.name}</p>
+              <p>{gegner.street}, {gegner.zipCode} {gegner.city}</p>
+              <p>{gegner.email}</p>
+            </div>
+          ) : (
+            <p>N/A</p>
+          )}
           <p>Kennzeichen: {record.gegnerKennzeichen || 'N/A'}</p>
         </div>
       </div>
