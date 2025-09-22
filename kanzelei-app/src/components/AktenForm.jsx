@@ -263,15 +263,15 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
       </div>
 
       <Modal isOpen={isAddBeteiligteModalOpen} onClose={() => setIsAddBeteiligteModalOpen(false)}>
-        <PersonForm onSubmit={handleAddBeteiligteSubmit} onCancel={() => setIsAddBeteiligteModalOpen(false)} title="Neuen Beteiligten anlegen" />
+        <PersonForm as="div" onSubmit={handleAddBeteiligteSubmit} onCancel={() => setIsAddBeteiligteModalOpen(false)} title="Neuen Beteiligten anlegen" />
       </Modal>
 
       <Modal isOpen={isAddMandantModalOpen} onClose={() => setIsAddMandantModalOpen(false)}>
-        <PersonForm onSubmit={handleAddMandantSubmit} onCancel={() => setIsAddMandantModalOpen(false)} title="Neuen Mandant anlegen" />
+        <PersonForm as="div" onSubmit={handleAddMandantSubmit} onCancel={() => setIsAddMandantModalOpen(false)} title="Neuen Mandant anlegen" />
       </Modal>
 
       <Modal isOpen={isAddGegnerModalOpen} onClose={() => setIsAddGegnerModalOpen(false)}>
-        <PersonForm onSubmit={handleAddGegnerSubmit} onCancel={() => setIsAddGegnerModalOpen(false)} title="Neuen Gegner anlegen" />
+        <PersonForm as="div" onSubmit={handleAddGegnerSubmit} onCancel={() => setIsAddGegnerModalOpen(false)} title="Neuen Gegner anlegen" />
       </Modal>
     </form>
   );
