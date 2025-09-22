@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/Button.jsx';
 
-const PersonForm = ({ person, onSubmit, onCancel, title, as: Component = 'form' }) => {
+const PersonForm = ({ person, onSubmit, onCancel, title }) => {
   const [formData, setFormData] = useState({
     anrede: '',
     vorname: '',
@@ -34,17 +34,15 @@ const PersonForm = ({ person, onSubmit, onCancel, title, as: Component = 'form' 
   };
 
   const handleSubmit = (e) => {
-    if (e) e.preventDefault();
+    e.preventDefault();
     const { vorname, nachname, ...rest } = formData;
     const name = `${vorname} ${nachname}`.trim();
     onSubmit({ ...rest, name });
     onCancel();
   };
 
-  const formProps = Component === 'form' ? { onSubmit: handleSubmit } : {};
-
   return (
-    <Component {...formProps} className="p-6 bg-white rounded-lg">
+    <form onSubmit={handleSubmit} className="p-6 bg-white rounded-lg">
       <h3 className="text-xl font-bold mb-6 text-gray-800">{title}</h3>
       <div className="space-y-4">
         <select name="anrede" value={formData.anrede} onChange={handleChange} className="input-field w-full">
@@ -73,11 +71,11 @@ const PersonForm = ({ person, onSubmit, onCancel, title, as: Component = 'form' 
         <Button type="button" onClick={onCancel} className="bg-gray-300 hover:bg-gray-400 text-gray-800">
           Abbrechen
         </Button>
-        <Button type={Component === 'form' ? 'submit' : 'button'} onClick={Component === 'form' ? undefined : handleSubmit}>
+        <Button type="button" onClick={handleSubmit}>
           Speichern
         </Button>
       </div>
-    </Component>
+    </form>
   );
 };
 
