@@ -1,0 +1,8 @@
+{
+  "id": "mandant-1",
+  "name": "Max Mustermann",
+  "street": "Musterstraße 1",
+  "zipCode": "12345",
+  "city": "Musterstadt",
+  "email": "max.mustermann@example.com"
+}

@@ -50,13 +50,13 @@ export const App = () => {
   };
   
   const handleOpenAkteModal = (akte = null) => {
-    setSelectedItem(akte);
-    if (akte) {
-      setCurrentView('akten_detail');
-    } else {
-      setIsModalOpen(true);
-    }
-  };
+  setSelectedItem(akte);
+  if (akte) {
+    setCurrentView('akten_detail');
+  } else {
+    setIsModalOpen(true);
+  }
+};
 
   const handleGoBackToList = () => {
     setSelectedItem(null);
@@ -113,7 +113,7 @@ export const App = () => {
   };
 
   useEffect(() => {
-    checkStatus(); // Check status on initial load
+    // checkStatus(); // Check status on initial load
   }, []);
 
   useEffect(() => {
@@ -202,7 +202,7 @@ export const App = () => {
         {/* Hauptansicht */}
         <main>
           {currentView === 'akten' && (
-             <>
+            <>
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-semibold text-gray-700">Aktenübersicht</h2>
                 <div className="flex items-center">

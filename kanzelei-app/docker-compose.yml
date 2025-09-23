@@ -2,6 +2,21 @@ version: '3.8'
 
 services:
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "3001:3001"
+    volumes:
+      - .:/app
+    command: sh -c "node load-initial-data.js && node get-data.js"
+    
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - HOST=0.0.0.0
+    command: npm start
