@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { useKanzleiLogic } from './hooks/useKanzleiLogic.js';
-import { connectDb, getDbStatus } from './api.js';
 import { Modal } from './components/ui/Modal.jsx';
 import { AktenList } from './components/AktenList.jsx';
 import AktenForm from './components/AktenForm.jsx';
@@ -38,7 +37,6 @@ export const App = () => {
   const importInputRef = useRef(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
-  const [dbStatus, setDbStatus] = useState({ status: 'idle', message: 'Unknown' });
 
   const navigateToStammdaten = (tab = 'mandanten') => {
     setInitialStammdatenTab(tab);
@@ -93,18 +91,6 @@ export const App = () => {
     e.target.value = null;
   };
   
-  const handleDbConnect = async () => {
-    setDbStatus({ status: 'checking', message: 'Stelle Verbindung her...' });
-    try {
-      const result = await connectDb();
-      setDbStatus({ status: 'ok', message: result.message });
-    } catch (error) {
-      setDbStatus({ status: 'error', message: error.message });
-    }
-  };
-
-
-
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -124,30 +110,12 @@ export const App = () => {
     }
   }, [records, selectedItem]);
 
-  const statusIndicatorClasses = {
-    idle: 'bg-gray-400',
-    disconnected: 'bg-gray-400',
-    checking: 'bg-yellow-400 animate-ping',
-    ok: 'bg-green-500',
-    error: 'bg-red-500',
-  };
-
-  const buttonText = dbStatus.status === 'ok' ? 'Verbindung prüfen' : 'Verbinden';
-
   return (
     <div className="bg-gray-100 min-h-screen p-8 font-sans antialiased text-gray-800">
       <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-8">
         <header className="flex justify-between items-center mb-8 pb-4 border-b">
           <h1 className="text-3xl font-bold text-gray-700">A-W-R Aktenverwaltung</h1>
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <button onClick={handleDbConnect} className="bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-semibold py-1 px-3 rounded-md border border-gray-300">
-                {buttonText}
-              </button>
-              <span title={dbStatus.message} className="relative flex h-3 w-3">
-                <span className={`relative inline-flex rounded-full h-3 w-3 ${statusIndicatorClasses[dbStatus.status]}`}></span>
-              </span>
-            </div>
             <div className="relative" ref={dropdownRef}>
               <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="p-2 rounded-full hover:bg-gray-200 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
