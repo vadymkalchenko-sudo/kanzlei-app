@@ -1,19 +1,17 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const formidable = require('formidable');
 
 const app = express();
 const port = 3001;
 
-app.use(cors({ origin: 'http://localhost:3000' }));
+app.use(cors()); // Allow all origins
 app.use(express.json());
 
-const basePath = process.env.STORAGE_PATH || path.join(__dirname, 'kanzlei-data');
-console.log('Anwendung versucht zu schreiben in:', basePath);
+const basePath = '/app/kanzlei-data';
+console.log('Application will write to:', basePath);
 
 const initializeData = () => {
     const initialDataPath = path.join(__dirname, 'initial-data');
@@ -40,24 +38,10 @@ const initializeData = () => {
     copyInitialFile('akte2.json', path.join('records', 'akte-2.json'));
     copyInitialFile('akte3.json', path.join('records', 'akte-3.json'));
 
-    console.log('Musterdaten erfolgreich in das Dateisystem geladen.');
+    console.log('Initial data successfully loaded into the file system.');
 };
 
 initializeData();
-
-// Middleware for formidable
-const formParser = (req, res, next) => {
-    const form = formidable({});
-    form.parse(req, (err, fields, files) => {
-        if (err) {
-            next(err);
-            return;
-        }
-        req.body = fields;
-        req.files = files;
-        next();
-    });
-};
 
 // Generische CRUD-Fabrik für alle Entitäten (Records, Mandanten, Dritte Beteiligte)
 const createCrudEndpoints = (router, storageDir, entityName) => {
