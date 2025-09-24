@@ -9,7 +9,8 @@ services:
       - "3001:3001"
     volumes:
       - .:/app
-    command: sh -c "node load-initial-data.js && node get-data.js"
+      - /app/node_modules
+    command: npm run start-backend
     
   frontend:
     build:
@@ -19,4 +20,7 @@ services:
       - "3000:3000"
     environment:
       - HOST=0.0.0.0
+    volumes:
+      - .:/app
+      - /app/node_modules
     command: npm start
