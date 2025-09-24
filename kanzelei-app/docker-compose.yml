@@ -3,24 +3,26 @@ version: '3.8'
 services:
   backend:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     ports:
       - "3001:3001"
     volumes:
-      - .:/app
+      - ./backend:/app
       - /app/node_modules
-    command: npm run start-backend
-    
+    command: npm start
+
   frontend:
     build:
-      context: .
+      context: ./frontend
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
       - HOST=0.0.0.0
     volumes:
-      - .:/app
+      - ./frontend:/app
       - /app/node_modules
     command: npm start
+    depends_on:
+      - backend

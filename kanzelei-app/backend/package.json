@@ -1,0 +1,16 @@
+{
+  "name": "kanzelei-backend",
+  "version": "1.0.0",
+  "description": "Backend for the Kanzlei-App",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "formidable": "^3.5.1",
+    "pg": "^8.16.3"
+  }
+}
