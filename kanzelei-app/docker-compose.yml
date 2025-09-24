@@ -8,8 +8,7 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - ./backend:/app
-      - /app/node_modules
+      - ./backend/kanzlei-data:/app/kanzlei-data
     command: npm start
 
   frontend:
@@ -17,12 +16,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
-    environment:
-      - HOST=0.0.0.0
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: npm start
+      - "3000:80"
     depends_on:
       - backend
+volumes:
+  kanzlei-data:
