@@ -103,18 +103,7 @@ export const App = () => {
     }
   };
 
-  const checkStatus = async () => {
-    try {
-      const result = await getDbStatus();
-      setDbStatus(result);
-    } catch (error) {
-      setDbStatus({ status: 'error', message: error.message });
-    }
-  };
 
-  useEffect(() => {
-    // checkStatus(); // Check status on initial load
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -133,7 +122,7 @@ export const App = () => {
         setSelectedItem(updatedRecord);
       }
     }
-  }, [records]);
+  }, [records, selectedItem]);
 
   const statusIndicatorClasses = {
     idle: 'bg-gray-400',

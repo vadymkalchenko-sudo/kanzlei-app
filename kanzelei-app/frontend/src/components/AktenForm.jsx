@@ -29,7 +29,6 @@ const initialFormData = {
 export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, onCancel, nextCaseNumber, handleDritteSubmit, handleMandantSubmit }) => {
   const [formData, setFormData] = useState({ ...initialFormData, ...akte });
   const [isNewMandant, setIsNewMandant] = useState(!akte?.mandantId);
-  const [errors, setErrors] = useState({});
 
   const [dritteSearch, setDritteSearch] = useState('');
   const [selectedDritte, setSelectedDritte] = useState([]);
