@@ -1,6 +1,6 @@
 FROM node:18
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY package.json ./
 RUN npm install --production
 COPY server.js .
 COPY initial-data/ ./initial-data/
