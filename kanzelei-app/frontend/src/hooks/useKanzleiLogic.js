@@ -94,9 +94,6 @@ export const useKanzleiLogic = () => {
       const recordToUpdate = records.find(r => r.id === recordId);
       if (!recordToUpdate) throw new Error('Akte nicht gefunden');
 
-      // Create a deep copy to avoid any potential mutation of the original state object
-      const clonedRecord = JSON.parse(JSON.stringify(recordToUpdate));
-
       const newDocuments = await Promise.all(Array.from(files).map(async (file) => {
         const content = await readFileAsBase64(file);
         return {
@@ -110,9 +107,12 @@ export const useKanzleiLogic = () => {
         };
       }));
 
-      const updatedDokumente = [...(clonedRecord.dokumente || []), ...newDocuments];
+      const updatedRecord = {
+        ...recordToUpdate,
+        dokumente: [...(recordToUpdate.dokumente || []), ...newDocuments],
+      };
 
-      await api.updateRecord(recordId, { dokumente: updatedDokumente });
+      await api.updateRecord(recordId, updatedRecord);
       setFlashMessage(`${files.length} Dokument(e) erfolgreich hinzugefügt.`);
       fetchData();
     } catch (error) {
@@ -153,7 +153,12 @@ export const useKanzleiLogic = () => {
         doc.id === documentId ? { ...doc, ...updatedDocData } : doc
       );
 
-      await api.updateRecord(recordId, { dokumente: updatedDocuments });
+      const updatedRecord = {
+        ...recordToUpdate,
+        dokumente: updatedDocuments,
+      };
+
+      await api.updateRecord(recordId, updatedRecord);
       setFlashMessage('Dokument erfolgreich aktualisiert.');
       fetchData();
     } catch (error) {
@@ -170,7 +175,12 @@ export const useKanzleiLogic = () => {
 
       const updatedDokumente = recordToUpdate.dokumente.filter(d => d.id !== documentId);
 
-      await api.updateRecord(recordId, { dokumente: updatedDokumente });
+      const updatedRecord = {
+        ...recordToUpdate,
+        dokumente: updatedDokumente,
+      };
+
+      await api.updateRecord(recordId, updatedRecord);
       setFlashMessage('Dokument erfolgreich gelöscht.');
       fetchData();
     } catch (error) {
