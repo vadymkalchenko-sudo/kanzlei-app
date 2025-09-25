@@ -8,7 +8,7 @@ const app = express();
 const port = 3001;
 
 app.use(cors()); // Allow all origins
-app.use(express.json({ limit: '200kb' }));
+app.use(express.json({ limit: '50mb' }));
 
 const basePath = '/app/kanzlei-data';
 console.log('Application will write to:', basePath);
