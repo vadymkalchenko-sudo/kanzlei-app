@@ -1,12 +1,27 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Button } from './ui/Button.jsx';
 import { Modal } from './ui/Modal.jsx';
 import DocumentForm from './DocumentForm.jsx';
+import NoteForm from './NoteForm.jsx';
 
-export const Aktenansicht = ({ record, mandant, dritteBeteiligte, onGoBack, onDirectEdit, onAddDocuments, onDeleteDocument, onUpdateDocument }) => {
+export const Aktenansicht = ({
+  record,
+  mandant,
+  dritteBeteiligte,
+  onGoBack,
+  onDirectEdit,
+  onAddDocuments,
+  onDeleteDocument,
+  onUpdateDocument,
+  onAddNote,
+  onUpdateNote,
+  onDeleteNote
+}) => {
   const fileInputRef = useRef(null);
   const [isEditDocModalOpen, setIsEditDocModalOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [selectedNote, setSelectedNote] = useState(null);
 
   const handleDragOver = (e) => { e.preventDefault(); };
 
@@ -41,6 +56,25 @@ export const Aktenansicht = ({ record, mandant, dritteBeteiligte, onGoBack, onDi
   const handleUpdateDocSubmit = (updatedData) => {
     onUpdateDocument(record.id, selectedDoc.id, updatedData);
     handleCloseEditModal();
+  };
+
+  const handleOpenNoteModal = (note = null) => {
+    setSelectedNote(note);
+    setIsNoteModalOpen(true);
+  };
+
+  const handleCloseNoteModal = () => {
+    setIsNoteModalOpen(false);
+    setSelectedNote(null);
+  };
+
+  const handleNoteSubmit = (noteData) => {
+    if (selectedNote) {
+      onUpdateNote(record.id, selectedNote.id, noteData);
+    } else {
+      onAddNote(record.id, noteData);
+    }
+    handleCloseNoteModal();
   };
 
   const base64ToBlob = (base64, mimeType) => {
@@ -80,7 +114,10 @@ export const Aktenansicht = ({ record, mandant, dritteBeteiligte, onGoBack, onDi
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
-    const [year, month, day] = dateString.split('-');
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
     return `${day}.${month}.${year}`;
   };
 
@@ -92,6 +129,13 @@ export const Aktenansicht = ({ record, mandant, dritteBeteiligte, onGoBack, onDi
   const gegner = record.gegnerId && dritteBeteiligte
     ? dritteBeteiligte.find(d => d.id === record.gegnerId)
     : null;
+
+  const combinedItems = useMemo(() => {
+    const documents = (record.dokumente || []).map(doc => ({ ...doc, itemType: 'document', date: doc.datum }));
+    const notes = (record.notizen || []).map(note => ({ ...note, itemType: 'note', date: note.aktualisierungsdatum }));
+
+    return [...documents, ...notes].sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [record.dokumente, record.notizen]);
 
   return (
     <div className="p-4 bg-white rounded-lg shadow-md">
@@ -138,48 +182,70 @@ export const Aktenansicht = ({ record, mandant, dritteBeteiligte, onGoBack, onDi
 
       {/* Document Management Section */}
       <div>
-        <h3 className="text-xl font-semibold mb-4">Dokumenten- und Zahlungsverwaltung</h3>
+        <h3 className="text-xl font-semibold mb-4">Dokumenten- und Notizverwaltung</h3>
         <div className="flex items-center gap-4 mb-4">
           <div onDragOver={handleDragOver} onDrop={handleDrop} className="flex-grow border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50 hover:bg-gray-100">
             <p className="text-gray-500">Dateien hierher ziehen</p>
           </div>
           <Button onClick={handleFileSelectClick} className="bg-gray-600 hover:bg-gray-700">Oder Dateien auswählen</Button>
           <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" multiple />
+          <Button onClick={() => handleOpenNoteModal(null)} className="bg-green-600 hover:bg-green-700">
+            ➕ Add Note / Notiz hinzufügen
+          </Button>
         </div>
 
         <div className="overflow-x-auto rounded-lg border">
           <table className="min-w-full table-auto">
             <thead className="bg-gray-200">
               <tr>
+                <th className="px-4 py-2 border-b text-center">Typ</th>
                 <th className="px-4 py-2 border-b">Datum</th>
-                <th className="px-4 py-2 border-b">Beschreibung</th>
-                <th className="px-4 py-2 border-b">Format</th>
+                <th className="px-4 py-2 border-b">Beschreibung / Titel</th>
+                <th className="px-4 py-2 border-b">Format / Art</th>
                 <th className="px-4 py-2 border-b text-right">Soll</th>
                 <th className="px-4 py-2 border-b text-right">Haben</th>
                 <th className="px-4 py-2 border-b text-center">Aktionen</th>
               </tr>
             </thead>
             <tbody className="bg-white">
-              {(record.dokumente || []).length > 0 ? (
-                (record.dokumente || []).map((doc) => (
-                  <tr key={doc.id} onDoubleClick={() => handleOpenDocument(doc)} className="hover:bg-gray-50 cursor-pointer">
-                    <td className="px-4 py-2 border-b">{formatDate(doc.datum)}</td>
-                    <td className="px-4 py-2 border-b">{doc.beschreibung}</td>
-                    <td className="px-4 py-2 border-b">{simplifyFormat(doc)}</td>
-                    <td className="px-4 py-2 border-b text-right">{doc.soll?.toFixed(2)} €</td>
-                    <td className="px-4 py-2 border-b text-right">{doc.haben?.toFixed(2)} €</td>
+              {combinedItems.length > 0 ? (
+                combinedItems.map((item) => (
+                  <tr
+                    key={item.id}
+                    onDoubleClick={() => item.itemType === 'document' ? handleOpenDocument(item) : handleOpenNoteModal(item)}
+                    className="hover:bg-gray-50 cursor-pointer"
+                  >
+                    <td className="px-4 py-2 border-b text-center">{item.itemType === 'document' ? '📄' : '📝'}</td>
+                    <td className="px-4 py-2 border-b">{formatDate(item.date)}</td>
+                    <td className="px-4 py-2 border-b">{item.itemType === 'document' ? item.beschreibung : item.titel}</td>
+                    <td className="px-4 py-2 border-b">{item.itemType === 'document' ? simplifyFormat(item) : item.typ}</td>
+                    <td className="px-4 py-2 border-b text-right">{item.itemType === 'document' && item.soll ? `${item.soll.toFixed(2)} €` : '–'}</td>
+                    <td className="px-4 py-2 border-b text-right">{item.itemType === 'document' && item.haben ? `${item.haben.toFixed(2)} €` : '–'}</td>
                     <td className="px-4 py-2 border-b text-center">
-                      <button onClick={(e) => { e.stopPropagation(); handleOpenEditModal(doc); }} className="p-1 text-blue-600 hover:text-blue-800" title="Bearbeiten">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); onDeleteDocument(record.id, doc.id); }} className="p-1 text-red-600 hover:text-red-800 ml-2" title="Löschen">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
+                      {item.itemType === 'document' ? (
+                        <>
+                          <button onClick={(e) => { e.stopPropagation(); handleOpenEditModal(item); }} className="p-1 text-blue-600 hover:text-blue-800" title="Bearbeiten">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); onDeleteDocument(record.id, item.id); }} className="p-1 text-red-600 hover:text-red-800 ml-2" title="Löschen">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={(e) => { e.stopPropagation(); handleOpenNoteModal(item); }} className="p-1 text-blue-600 hover:text-blue-800" title="Bearbeiten">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); onDeleteNote(record.id, item.id); }} className="p-1 text-red-600 hover:text-red-800 ml-2" title="Löschen">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="6" className="text-center py-12 text-gray-500">Keine Dokumente vorhanden.</td></tr>
+                <tr><td colSpan="7" className="text-center py-12 text-gray-500">Keine Dokumente oder Notizen vorhanden.</td></tr>
               )}
             </tbody>
           </table>
@@ -189,6 +255,12 @@ export const Aktenansicht = ({ record, mandant, dritteBeteiligte, onGoBack, onDi
       {isEditDocModalOpen && (
         <Modal isOpen={isEditDocModalOpen} onClose={handleCloseEditModal}>
           <DocumentForm document={selectedDoc} onSubmit={handleUpdateDocSubmit} onCancel={handleCloseEditModal} />
+        </Modal>
+      )}
+
+      {isNoteModalOpen && (
+        <Modal isOpen={isNoteModalOpen} onClose={handleCloseNoteModal}>
+          <NoteForm note={selectedNote} onSubmit={handleNoteSubmit} onCancel={handleCloseNoteModal} />
         </Modal>
       )}
     </div>
