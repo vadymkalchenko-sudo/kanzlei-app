@@ -166,6 +166,79 @@ export const useKanzleiLogic = () => {
     }
   };
 
+  const handleAddNote = async (recordId, noteData) => {
+    try {
+      const recordToUpdate = records.find(r => r.id === recordId);
+      if (!recordToUpdate) throw new Error('Akte nicht gefunden');
+
+      const now = new Date().toISOString();
+      const newNote = {
+        id: `note_${new Date().getTime()}`,
+        akte_id: recordId,
+        ...noteData,
+        autor: 'Sachbearbeiter_A', // Hardcoded as per spec for now
+        typ: 'Notiz/Vermerk',
+        erstelldatum: now,
+        aktualisierungsdatum: now,
+      };
+
+      const updatedRecord = {
+        ...recordToUpdate,
+        notizen: [...(recordToUpdate.notizen || []), newNote],
+      };
+
+      await api.updateRecord(recordId, updatedRecord);
+      setFlashMessage('Notiz erfolgreich hinzugefügt.');
+      fetchData();
+    } catch (error) {
+      setFlashMessage(`Fehler beim Hinzufügen der Notiz: ${error.message}`);
+    }
+  };
+
+  const handleUpdateNote = async (recordId, noteId, noteData) => {
+    try {
+      const recordToUpdate = records.find(r => r.id === recordId);
+      if (!recordToUpdate) throw new Error('Akte nicht gefunden');
+
+      const updatedNotizen = recordToUpdate.notizen.map(note =>
+        note.id === noteId
+          ? { ...note, ...noteData, aktualisierungsdatum: new Date().toISOString() }
+          : note
+      );
+
+      const updatedRecord = {
+        ...recordToUpdate,
+        notizen: updatedNotizen,
+      };
+
+      await api.updateRecord(recordId, updatedRecord);
+      setFlashMessage('Notiz erfolgreich aktualisiert.');
+      fetchData();
+    } catch (error) {
+      setFlashMessage(`Fehler beim Aktualisieren der Notiz: ${error.message}`);
+    }
+  };
+
+  const handleDeleteNote = async (recordId, noteId) => {
+    try {
+      const recordToUpdate = records.find(r => r.id === recordId);
+      if (!recordToUpdate) throw new Error('Akte nicht gefunden');
+
+      const updatedNotizen = recordToUpdate.notizen.filter(note => note.id !== noteId);
+
+      const updatedRecord = {
+        ...recordToUpdate,
+        notizen: updatedNotizen,
+      };
+
+      await api.updateRecord(recordId, updatedRecord);
+      setFlashMessage('Notiz erfolgreich gelöscht.');
+      fetchData();
+    } catch (error) {
+      setFlashMessage(`Fehler beim Löschen der Notiz: ${error.message}`);
+    }
+  };
+
   const handleDeleteDocument = async (recordId, documentId) => {
     try {
       const recordToUpdate = records.find(r => r.id === recordId);
@@ -323,6 +396,9 @@ export const useKanzleiLogic = () => {
     handleAddDocuments,
     handleUpdateDocument,
     handleDeleteDocument,
+    handleAddNote,
+    handleUpdateNote,
+    handleDeleteNote,
     fetchData,
     handleExport,
     handleImport,

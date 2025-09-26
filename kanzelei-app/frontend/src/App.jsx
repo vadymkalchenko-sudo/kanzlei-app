@@ -23,6 +23,9 @@ export const App = () => {
     handleAddDocuments,
     handleUpdateDocument,
     handleDeleteDocument,
+    handleAddNote,
+    handleUpdateNote,
+    handleDeleteNote,
     handleExport,
     handleImport,
     nextCaseNumber,
@@ -219,6 +222,9 @@ export const App = () => {
               onAddDocuments={handleAddDocuments}
               onDeleteDocument={handleDeleteDocument}
               onUpdateDocument={handleUpdateDocument}
+              onAddNote={handleAddNote}
+              onUpdateNote={handleUpdateNote}
+              onDeleteNote={handleDeleteNote}
             />
           )}
         </main>
