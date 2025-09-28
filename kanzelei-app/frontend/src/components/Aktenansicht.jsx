@@ -3,7 +3,7 @@ import { Button } from './ui/Button.jsx';
 import { Modal } from './ui/Modal.jsx';
 import DocumentForm from './DocumentForm.jsx';
 import NoteForm from './NoteForm.jsx';
-import FristenPanel from './FristenPanel.jsx';
+import AufgabenPanel from './AufgabenPanel.jsx';
 
 export const Aktenansicht = ({
   record,
@@ -18,11 +18,11 @@ export const Aktenansicht = ({
   onUpdateNote,
   onDeleteNote,
   onUpdateRecord,
-  // Fristen-Props
-  onAddFrist,
-  onUpdateFrist,
-  onDeleteFrist,
-  onToggleFristErledigt,
+  // Aufgaben-Props
+  onAddAufgabe,
+  onUpdateAufgabe,
+  onDeleteAufgabe,
+  onToggleAufgabeErledigt,
 }) => {
   const fileInputRef = useRef(null);
   const [isEditDocModalOpen, setIsEditDocModalOpen] = useState(false);
@@ -323,13 +323,13 @@ export const Aktenansicht = ({
 
         {/* Sidebar */}
         <div className="lg:col-span-1">
-          <FristenPanel
+          <AufgabenPanel
             recordId={record.id}
-            fristen={record.fristen || []}
-            onAddFrist={onAddFrist}
-            onUpdateFrist={onUpdateFrist}
-            onDeleteFrist={onDeleteFrist}
-            onToggleFristErledigt={onToggleFristErledigt}
+            aufgaben={record.aufgaben || []}
+            onAddAufgabe={onAddAufgabe}
+            onUpdateAufgabe={onUpdateAufgabe}
+            onDeleteAufgabe={onDeleteAufgabe}
+            onToggleAufgabeErledigt={onToggleAufgabeErledigt}
           />
         </div>
       </div>

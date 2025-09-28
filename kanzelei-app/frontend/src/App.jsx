@@ -29,6 +29,10 @@ export const App = () => {
     handleUpdateNote,
     handleDeleteNote,
     handleToggleNoteErledigt,
+    handleAddAufgabe,
+    handleUpdateAufgabe,
+    handleDeleteAufgabe,
+    handleToggleAufgabeErledigt,
     handleExport,
     handleImport,
     nextCaseNumber,
@@ -249,6 +253,10 @@ export const App = () => {
               onUpdateNote={handleUpdateNote}
               onDeleteNote={handleDeleteNote}
               onToggleNoteErledigt={handleToggleNoteErledigt}
+              onAddAufgabe={handleAddAufgabe}
+              onUpdateAufgabe={handleUpdateAufgabe}
+              onDeleteAufgabe={handleDeleteAufgabe}
+              onToggleAufgabeErledigt={handleToggleAufgabeErledigt}
             />
           )}
         </main>
