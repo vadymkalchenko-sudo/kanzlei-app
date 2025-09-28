@@ -90,6 +90,7 @@ const NoteForm = ({ note, onSubmit, onCancel }) => {
               onChange={handleChange}
               className="input-field w-full"
               required={isDeadline}
+              min={new Date().toISOString().split('T')[0]}
             />
           </div>
         )}

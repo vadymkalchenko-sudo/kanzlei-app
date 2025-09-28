@@ -1,5 +1,41 @@
 import React from 'react';
 
+const getDeadlineStatus = (record) => {
+  if (!record.notizen || record.notizen.length === 0) {
+    return null;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Normalize to start of day
+
+  let closestDeadline = null;
+
+  for (const note of record.notizen) {
+    if (note.datum && !note.erledigt) {
+      const deadlineDate = new Date(note.datum);
+      if (!closestDeadline || deadlineDate < closestDeadline) {
+        closestDeadline = deadlineDate;
+      }
+    }
+  }
+
+  if (!closestDeadline) {
+    return null;
+  }
+
+  const sevenDaysFromNow = new Date(today);
+  sevenDaysFromNow.setDate(today.getDate() + 7);
+
+  if (closestDeadline <= today) {
+    return 'urgent'; // Red
+  }
+  if (closestDeadline <= sevenDaysFromNow) {
+    return 'warning'; // Yellow
+  }
+
+  return null;
+};
+
 /**
  * Eine Komponente zur Anzeige der Aktenliste in einer Tabelle.
  * @param {object[]} records - Die Liste der anzuzeigenden Akten.
@@ -26,9 +62,17 @@ export const AktenList = ({ records, mandanten, onEdit }) => {
         <tbody className="bg-white divide-y divide-gray-200">
           {records.map((record) => {
             const mandant = mandanten.find(m => m.id === record.mandantId);
+            const deadlineStatus = getDeadlineStatus(record);
             return (
               <tr key={record.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">{record.caseNumber}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">
+                  {deadlineStatus && (
+                    <span className={`mr-2 ${deadlineStatus === 'urgent' ? 'text-red-500' : 'text-yellow-500'}`} title={deadlineStatus === 'urgent' ? 'Frist heute oder überfällig' : 'Frist in weniger als 7 Tagen'}>
+                      ⏰
+                    </span>
+                  )}
+                  {record.caseNumber}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{mandant ? mandant.name : 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${record.status === 'offen' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
