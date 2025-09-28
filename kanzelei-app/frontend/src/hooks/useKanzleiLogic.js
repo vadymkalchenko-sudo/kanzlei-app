@@ -239,6 +239,28 @@ export const useKanzleiLogic = () => {
     }
   };
 
+  const handleToggleNoteErledigt = async (recordId, noteId) => {
+    try {
+      const recordToUpdate = records.find(r => r.id === recordId);
+      if (!recordToUpdate) throw new Error('Akte nicht gefunden');
+
+      const updatedNotizen = recordToUpdate.notizen.map(note =>
+        note.id === noteId ? { ...note, erledigt: !note.erledigt } : note
+      );
+
+      const updatedRecord = {
+        ...recordToUpdate,
+        notizen: updatedNotizen,
+      };
+
+      await api.updateRecord(recordId, updatedRecord);
+      setFlashMessage('Notiz-Status erfolgreich geändert.');
+      fetchData();
+    } catch (error) {
+      setFlashMessage(`Fehler beim Ändern des Notiz-Status: ${error.message}`);
+    }
+  };
+
   const handleDeleteDocument = async (recordId, documentId) => {
     try {
       const recordToUpdate = records.find(r => r.id === recordId);
@@ -399,6 +421,7 @@ export const useKanzleiLogic = () => {
     handleAddNote,
     handleUpdateNote,
     handleDeleteNote,
+    handleToggleNoteErledigt,
     fetchData,
     handleExport,
     handleImport,
