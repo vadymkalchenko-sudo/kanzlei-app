@@ -5,6 +5,7 @@ import { AktenList } from './components/AktenList.jsx';
 import AktenForm from './components/AktenForm.jsx';
 import Stammdatenverwaltung from './components/Stammdatenverwaltung.jsx';
 import Aktenansicht from './components/Aktenansicht.jsx';
+import PersonForm from './components/PersonForm.jsx';
 
 // Hauptkomponente, die die gesamte Anwendung darstellt
 export const App = () => {
@@ -32,11 +33,14 @@ export const App = () => {
     nextCaseNumber,
     setSearchTerm,
   } = useKanzleiLogic();
-  
+
   const [currentView, setCurrentView] = useState('akten');
   const [initialStammdatenTab, setInitialStammdatenTab] = useState('mandanten');
   const [itemToEdit, setItemToEdit] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [itemToEditInModal, setItemToEditInModal] = useState(null);
+  const [editType, setEditType] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const importInputRef = useRef(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -50,7 +54,7 @@ export const App = () => {
   const handleCloseMessage = () => {
     setFlashMessage(null);
   };
-  
+
   const handleOpenAkteModal = (akte = null) => {
   setSelectedItem(akte);
   if (akte) {
@@ -66,8 +70,24 @@ export const App = () => {
   };
 
   const handleDirectEdit = (item, type) => {
-    setItemToEdit(item);
-    navigateToStammdaten(type);
+    setItemToEditInModal(item);
+    setEditType(type);
+    setIsEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setItemToEditInModal(null);
+    setEditType(null);
+  };
+
+  const handleEditSubmit = async (data) => {
+    if (editType === 'mandanten') {
+      await handleMandantSubmit(data, { showMessage: true, fetchData: true });
+    } else if (editType === 'dritte') {
+      await handleDritteSubmit(data);
+    }
+    handleCloseEditModal();
   };
 
   const clearItemToEdit = () => {
@@ -94,7 +114,7 @@ export const App = () => {
     handleImport(file);
     e.target.value = null;
   };
-  
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -230,7 +250,7 @@ export const App = () => {
             />
           )}
         </main>
-        
+
         {/* Modal */}
         <Modal isOpen={isModalOpen} onClose={handleCloseModal}>
           {isModalOpen && (
@@ -244,6 +264,17 @@ export const App = () => {
               onNavigateToStammdaten={navigateToStammdaten}
               handleDritteSubmit={handleDritteSubmit}
               handleMandantSubmit={handleMandantSubmit}
+            />
+          )}
+        </Modal>
+
+        <Modal isOpen={isEditModalOpen} onClose={handleCloseEditModal}>
+          {isEditModalOpen && (
+            <PersonForm
+              person={itemToEditInModal}
+              onSubmit={handleEditSubmit}
+              onCancel={handleCloseEditModal}
+              title={`Bearbeiten: ${editType === 'mandanten' ? 'Mandant' : 'Dritter'}`}
             />
           )}
         </Modal>
