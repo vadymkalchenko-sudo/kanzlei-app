@@ -3,7 +3,6 @@ import { Button } from './ui/Button.jsx';
 import { Modal } from './ui/Modal.jsx';
 import DocumentForm from './DocumentForm.jsx';
 import NoteForm from './NoteForm.jsx';
-import FristenForm from './FristenForm.jsx';
 
 export const Aktenansicht = ({
   record,
@@ -17,18 +16,13 @@ export const Aktenansicht = ({
   onAddNote,
   onUpdateNote,
   onDeleteNote,
-  onAddFrist,
-  onUpdateFrist,
-  onDeleteFrist,
-  onToggleFrist,
+  onToggleNoteErledigt,
 }) => {
   const fileInputRef = useRef(null);
   const [isEditDocModalOpen, setIsEditDocModalOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [selectedNote, setSelectedNote] = useState(null);
-  const [isFristModalOpen, setIsFristModalOpen] = useState(false);
-  const [selectedFrist, setSelectedFrist] = useState(null);
 
   const handleDragOver = (e) => { e.preventDefault(); };
 
@@ -82,25 +76,6 @@ export const Aktenansicht = ({
       onAddNote(record.id, noteData);
     }
     handleCloseNoteModal();
-  };
-
-  const handleOpenFristModal = (frist = null) => {
-    setSelectedFrist(frist);
-    setIsFristModalOpen(true);
-  };
-
-  const handleCloseFristModal = () => {
-    setIsFristModalOpen(false);
-    setSelectedFrist(null);
-  };
-
-  const handleFristSubmit = (fristData) => {
-    if (selectedFrist) {
-      onUpdateFrist(record.id, selectedFrist.id, fristData);
-    } else {
-      onAddFrist(record.id, fristData);
-    }
-    handleCloseFristModal();
   };
 
   const base64ToBlob = (base64, mimeType) => {
@@ -230,6 +205,7 @@ export const Aktenansicht = ({
                 <th className="px-4 py-2 border-b">Format / Art</th>
                 <th className="px-4 py-2 border-b text-right">Soll</th>
                 <th className="px-4 py-2 border-b text-right">Haben</th>
+                <th className="px-4 py-2 border-b text-center">Erledigt</th>
                 <th className="px-4 py-2 border-b text-center">Aktionen</th>
               </tr>
             </thead>
@@ -239,14 +215,24 @@ export const Aktenansicht = ({
                   <tr
                     key={item.id}
                     onDoubleClick={() => item.itemType === 'document' ? handleOpenDocument(item) : handleOpenNoteModal(item)}
-                    className="hover:bg-gray-50 cursor-pointer"
+                    className={`hover:bg-gray-50 cursor-pointer ${item.itemType === 'note' && item.datum && !item.erledigt ? 'bg-red-50' : ''} ${item.itemType === 'note' && item.erledigt ? 'bg-green-100' : ''}`}
                   >
-                    <td className="px-4 py-2 border-b text-center">{item.itemType === 'document' ? '📄' : '📝'}</td>
-                    <td className="px-4 py-2 border-b">{formatDate(item.date)}</td>
+                    <td className="px-4 py-2 border-b text-center">{item.itemType === 'document' ? '📄' : (item.datum ? '📅' : '📝')}</td>
+                    <td className="px-4 py-2 border-b">{formatDate(item.datum ? item.datum : item.date)}</td>
                     <td className="px-4 py-2 border-b">{item.itemType === 'document' ? item.beschreibung : item.titel}</td>
                     <td className="px-4 py-2 border-b">{item.itemType === 'document' ? simplifyFormat(item) : item.typ}</td>
                     <td className="px-4 py-2 border-b text-right">{item.itemType === 'document' && item.soll ? `${item.soll.toFixed(2)} €` : '–'}</td>
                     <td className="px-4 py-2 border-b text-right">{item.itemType === 'document' && item.haben ? `${item.haben.toFixed(2)} €` : '–'}</td>
+                    <td className="px-4 py-2 border-b text-center">
+                      {item.itemType === 'note' && item.datum ? (
+                        <input
+                          type="checkbox"
+                          checked={!!item.erledigt}
+                          onChange={(e) => { e.stopPropagation(); onToggleNoteErledigt(record.id, item.id); }}
+                          className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                      ) : '–'}
+                    </td>
                     <td className="px-4 py-2 border-b text-center">
                       {item.itemType === 'document' ? (
                         <>
@@ -271,7 +257,7 @@ export const Aktenansicht = ({
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="7" className="text-center py-12 text-gray-500">Keine Dokumente oder Notizen vorhanden.</td></tr>
+                <tr><td colSpan="8" className="text-center py-12 text-gray-500">Keine Dokumente oder Notizen vorhanden.</td></tr>
               )}
             </tbody>
           </table>
@@ -287,62 +273,6 @@ export const Aktenansicht = ({
       {isNoteModalOpen && (
         <Modal isOpen={isNoteModalOpen} onClose={handleCloseNoteModal}>
           <NoteForm note={selectedNote} onSubmit={handleNoteSubmit} onCancel={handleCloseNoteModal} />
-        </Modal>
-      )}
-
-      {/* Fristen Management Section */}
-      <div className="mt-8">
-        <h3 className="text-xl font-semibold mb-4">Fristenverwaltung</h3>
-        <div className="flex justify-end mb-4">
-          <Button onClick={() => handleOpenFristModal(null)} className="bg-blue-600 hover:bg-blue-700">
-            ➕ Neue Frist hinzufügen
-          </Button>
-        </div>
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="min-w-full table-auto">
-            <thead className="bg-gray-200">
-              <tr>
-                <th className="px-4 py-2 border-b">Titel</th>
-                <th className="px-4 py-2 border-b">Datum</th>
-                <th className="px-4 py-2 border-b text-center">Erledigt</th>
-                <th className="px-4 py-2 border-b text-center">Aktionen</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white">
-              {record?.fristen && record.fristen.length > 0 ? (
-                record.fristen.map((frist) => (
-                  <tr key={frist.id} className={`hover:bg-gray-50 ${frist.erledigt ? 'bg-green-100' : ''}`}>
-                    <td className="px-4 py-2 border-b">{frist.titel}</td>
-                    <td className="px-4 py-2 border-b">{formatDate(frist.datum)}</td>
-                    <td className="px-4 py-2 border-b text-center">
-                      <input
-                        type="checkbox"
-                        checked={frist.erledigt}
-                        onChange={() => onToggleFrist(record.id, frist.id)}
-                        className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                    </td>
-                    <td className="px-4 py-2 border-b text-center">
-                      <button onClick={() => handleOpenFristModal(frist)} className="p-1 text-blue-600 hover:text-blue-800" title="Bearbeiten">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
-                      </button>
-                      <button onClick={() => onDeleteFrist(record.id, frist.id)} className="p-1 text-red-600 hover:text-red-800 ml-2" title="Löschen">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr><td colSpan="4" className="text-center py-12 text-gray-500">Keine Fristen vorhanden.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {isFristModalOpen && (
-        <Modal isOpen={isFristModalOpen} onClose={handleCloseFristModal}>
-          <FristenForm frist={selectedFrist} onSubmit={handleFristSubmit} onCancel={handleCloseFristModal} />
         </Modal>
       )}
     </div>
