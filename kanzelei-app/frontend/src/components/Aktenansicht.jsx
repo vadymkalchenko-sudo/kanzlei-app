@@ -31,9 +31,41 @@ export const Aktenansicht = ({
   const [selectedNote, setSelectedNote] = useState(null);
   const [quickMerke, setQuickMerke] = useState(record?.quick_merke || '');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [editingCell, setEditingCell] = useState(null); // { id: string, field: 'soll' | 'haben' }
+  const [editValue, setEditValue] = useState('');
 
   const toggleSortOrder = () => {
     setSortOrder(prevOrder => prevOrder === 'desc' ? 'asc' : 'desc');
+  };
+
+  const handleCellClick = (item, field) => {
+    setEditingCell({ id: item.id, field });
+    const value = item[field === 'soll' ? 'betrag_soll' : 'betrag_haben'] || 0;
+    setEditValue(value.toString().replace('.', ','));
+  };
+
+  const handleEditBlur = () => {
+    if (!editingCell) return;
+
+    const { id, field } = editingCell;
+    const item = combinedItems.find(i => i.id === id);
+    if (!item) {
+        setEditingCell(null);
+        return;
+    }
+
+    const isDocument = item.itemType === 'document';
+    const numericValue = parseFloat(editValue.replace(',', '.')) || 0;
+
+    const updateData = {
+      [field === 'soll' ? 'betrag_soll' : 'betrag_haben']: numericValue,
+    };
+
+    const updateFn = isDocument ? onUpdateDocument : onUpdateNote;
+    updateFn(record.id, id, updateData);
+
+    setEditingCell(null);
+    setEditValue('');
   };
 
   const handleQuickMerkeChange = (e) => {
@@ -126,6 +158,14 @@ export const Aktenansicht = ({
     });
   }, [record?.dokumente, record?.notizen, sortOrder]);
 
+  const netBalance = useMemo(() => {
+    return (combinedItems || []).reduce((acc, item) => {
+        const haben = parseFloat(item.betrag_haben) || 0;
+        const soll = parseFloat(item.betrag_soll) || 0;
+        return acc + haben - soll;
+    }, 0);
+  }, [combinedItems]);
+
   const handleOpenDocument = (doc) => {
     if (!doc.content) {
       alert('Dokumenteninhalt nicht gefunden. Die Datei wurde möglicherweise vor der Inhalts-Speicherung hochgeladen.');
@@ -193,6 +233,12 @@ export const Aktenansicht = ({
             className="w-full max-w-md p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
             placeholder="Schnelle Notizen (max. 100 Zeichen)"
           />
+        </div>
+        <div className="ml-4 text-right">
+            <h3 className="text-lg font-medium text-gray-500">Netto-Saldo</h3>
+            <p className={`text-2xl font-bold ${netBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {netBalance.toFixed(2).replace('.', ',')} €
+            </p>
         </div>
         <div className="ml-4">
           <Button onClick={onGoBack}>Zurück zur Übersicht</Button>
@@ -283,8 +329,38 @@ export const Aktenansicht = ({
                         <td className="px-4 py-2 border-b">{formatDate(item.date)}</td>
                         <td className="px-4 py-2 border-b">{item.itemType === 'document' ? item.beschreibung : item.titel}</td>
                         <td className="px-4 py-2 border-b">{item.itemType === 'document' ? simplifyFormat(item) : item.typ}</td>
-                        <td className="px-4 py-2 border-b text-right">{item.itemType === 'document' && item.soll ? `${item.soll.toFixed(2)} €` : '–'}</td>
-                        <td className="px-4 py-2 border-b text-right">{item.itemType === 'document' && item.haben ? `${item.haben.toFixed(2)} €` : '–'}</td>
+                        <td className="px-4 py-2 border-b text-right" onClick={() => handleCellClick(item, 'soll')}>
+                            {editingCell?.id === item.id && editingCell?.field === 'soll' ? (
+                                <input
+                                    type="text"
+                                    value={editValue}
+                                    onChange={(e) => setEditValue(e.target.value)}
+                                    onBlur={handleEditBlur}
+                                    onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-24 p-1 text-right bg-yellow-100 border-blue-500 border rounded-md"
+                                    autoFocus
+                                />
+                            ) : (
+                                `${(item.betrag_soll || 0).toFixed(2).replace('.', ',')} €`
+                            )}
+                        </td>
+                        <td className="px-4 py-2 border-b text-right" onClick={() => handleCellClick(item, 'haben')}>
+                            {editingCell?.id === item.id && editingCell?.field === 'haben' ? (
+                                <input
+                                    type="text"
+                                    value={editValue}
+                                    onChange={(e) => setEditValue(e.target.value)}
+                                    onBlur={handleEditBlur}
+                                    onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-24 p-1 text-right bg-yellow-100 border-blue-500 border rounded-md"
+                                    autoFocus
+                                />
+                            ) : (
+                                `${(item.betrag_haben || 0).toFixed(2).replace('.', ',')} €`
+                            )}
+                        </td>
                         <td className="px-4 py-2 border-b text-center">
                           {item.itemType === 'document' ? (
                             <>
