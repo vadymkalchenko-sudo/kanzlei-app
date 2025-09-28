@@ -2,19 +2,37 @@ import React, { useState } from 'react';
 import { Button } from './ui/Button.jsx';
 
 const NoteForm = ({ note, onSubmit, onCancel }) => {
+  const [isDeadline, setIsDeadline] = useState(!!note?.datum);
   const [formData, setFormData] = useState({
     titel: note?.titel || '',
     inhalt: note?.inhalt || '',
+    datum: note?.datum ? new Date(note.datum).toISOString().split('T')[0] : '',
+    erledigt: note?.erledigt || false,
   });
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, checked } = e.target;
+    if (name === 'isDeadline') {
+      setIsDeadline(checked);
+      if (!checked) {
+        // Clear date and erledigt status if it's no longer a deadline
+        setFormData((prev) => ({ ...prev, datum: '', erledigt: false }));
+      }
+    } else if (name === 'erledigt') {
+      setFormData((prev) => ({ ...prev, [name]: checked }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(formData);
+    const dataToSubmit = { ...formData };
+    if (!isDeadline) {
+      delete dataToSubmit.datum;
+      delete dataToSubmit.erledigt;
+    }
+    onSubmit(dataToSubmit);
     onCancel();
   };
 
@@ -46,6 +64,49 @@ const NoteForm = ({ note, onSubmit, onCancel }) => {
             required
           />
         </div>
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            name="isDeadline"
+            id="isDeadline"
+            checked={isDeadline}
+            onChange={handleChange}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <label htmlFor="isDeadline" className="ml-2 block text-sm text-gray-900">
+            Als Frist setzen
+          </label>
+        </div>
+        {isDeadline && (
+          <>
+            <div>
+              <label htmlFor="datum" className="block text-sm font-medium text-gray-700 mb-1">Fristdatum</label>
+              <input
+                type="date"
+                name="datum"
+                id="datum"
+                value={formData.datum}
+                onChange={handleChange}
+                className="input-field w-full"
+                required={isDeadline}
+                min={new Date().toISOString().split('T')[0]}
+              />
+            </div>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                name="erledigt"
+                id="erledigt"
+                checked={formData.erledigt}
+                onChange={handleChange}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="erledigt" className="ml-2 block text-sm text-gray-900">
+                Erledigt
+              </label>
+            </div>
+          </>
+        )}
       </div>
       <div className="flex justify-end space-x-4 mt-8">
         <Button type="button" onClick={onCancel} className="bg-gray-300 hover:bg-gray-400 text-gray-800">

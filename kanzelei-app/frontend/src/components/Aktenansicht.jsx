@@ -190,7 +190,7 @@ export const Aktenansicht = ({
           <Button onClick={handleFileSelectClick} className="bg-gray-600 hover:bg-gray-700">Oder Dateien auswählen</Button>
           <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" multiple />
           <Button onClick={() => handleOpenNoteModal(null)} className="bg-green-600 hover:bg-green-700">
-            + Frist / Notiz hinzufügen
+            ➕ Add Note / Notiz hinzufügen
           </Button>
         </div>
 
