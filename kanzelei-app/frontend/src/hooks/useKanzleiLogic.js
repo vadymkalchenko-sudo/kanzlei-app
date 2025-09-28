@@ -149,8 +149,12 @@ export const useKanzleiLogic = () => {
         throw new Error('Akte nicht gefunden');
       }
 
+      // Ensure 'soll' and 'haben' are numbers, providing a default of 0 if they are not.
+      const safeSoll = Number(updatedDocData.soll) || 0;
+      const safeHaben = Number(updatedDocData.haben) || 0;
+
       const updatedDocuments = recordToUpdate.dokumente.map(doc =>
-        doc.id === documentId ? { ...doc, ...updatedDocData } : doc
+        doc.id === documentId ? { ...doc, ...updatedDocData, soll: safeSoll, haben: safeHaben } : doc
       );
 
       const updatedRecord = {
@@ -318,12 +322,14 @@ export const useKanzleiLogic = () => {
 
       if (id) {
         const originalRecord = records.find(r => r.id === id);
+        const updatedRecord = { ...originalRecord, ...recordData };
+
         if (recordData.status === 'geschlossen' && originalRecord?.status !== 'geschlossen') {
           const clientForArchiving = mandanten.find(m => m.id === mandantId);
-          recordData.archivedMandantData = { ...clientForArchiving };
+          updatedRecord.archivedMandantData = { ...clientForArchiving };
           setFlashMessage('Akte wurde geschlossen und Mandantendaten archiviert.');
         }
-        await api.updateRecord(id, recordData);
+        await api.updateRecord(id, updatedRecord);
         setFlashMessage('Akte erfolgreich aktualisiert!');
       } else {
         const newRecord = { ...recordData, caseNumber: nextCaseNumber };
