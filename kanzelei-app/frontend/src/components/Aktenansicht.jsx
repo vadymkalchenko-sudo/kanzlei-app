@@ -17,12 +17,25 @@ export const Aktenansicht = ({
   onUpdateNote,
   onDeleteNote,
   onToggleNoteErledigt,
+  onUpdateRecord,
 }) => {
   const fileInputRef = useRef(null);
   const [isEditDocModalOpen, setIsEditDocModalOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [selectedNote, setSelectedNote] = useState(null);
+  const [quickMerke, setQuickMerke] = useState(record?.quick_merke || '');
+  const [sortOrder, setSortOrder] = useState('desc');
+
+  const handleQuickMerkeChange = (e) => {
+    setQuickMerke(e.target.value);
+  };
+
+  const handleQuickMerkeBlur = () => {
+    if (quickMerke !== (record?.quick_merke || '')) {
+      onUpdateRecord(record.id, { quick_merke: quickMerke });
+    }
+  };
 
   const handleDragOver = (e) => { e.preventDefault(); };
 
@@ -89,11 +102,25 @@ export const Aktenansicht = ({
   };
 
   const combinedItems = useMemo(() => {
-    const documents = (record?.dokumente || []).map(doc => ({ ...doc, itemType: 'document', date: doc.datum }));
-    const notes = (record?.notizen || []).map(note => ({ ...note, itemType: 'note', date: note.aktualisierungsdatum }));
+    const documents = (record?.dokumente || []).filter(Boolean).map(doc => ({ ...doc, itemType: 'document', date: doc.datum }));
+    const notes = (record?.notizen || []).filter(Boolean).map(note => ({ ...note, itemType: 'note', date: note.aktualisierungsdatum }));
 
-    return [...documents, ...notes].sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [record?.dokumente, record?.notizen]);
+    const allItems = [...documents, ...notes];
+
+    return allItems.sort((a, b) => {
+      const dateA = a.date ? new Date(a.date) : null;
+      const dateB = b.date ? new Date(b.date) : null;
+
+      const aIsValid = dateA && !isNaN(dateA);
+      const bIsValid = dateB && !isNaN(dateB);
+
+      if (aIsValid && !bIsValid) return -1;
+      if (!aIsValid && bIsValid) return 1;
+      if (!aIsValid && !bIsValid) return 0;
+
+      return sortOrder === 'desc' ? dateB.getTime() - dateA.getTime() : dateA.getTime() - dateB.getTime();
+    });
+  }, [record?.dokumente, record?.notizen, sortOrder]);
 
   const handleOpenDocument = (doc) => {
     if (!doc.content) {
@@ -141,9 +168,29 @@ export const Aktenansicht = ({
   return (
     <div className="p-4 bg-white rounded-lg shadow-md">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6 pb-4 border-b">
-        <h2 className="text-2xl font-semibold text-gray-800">Aktenansicht: {record.caseNumber}</h2>
-        <Button onClick={onGoBack}>Zurück zur Übersicht</Button>
+      <div className="flex justify-between items-start mb-6 pb-4 border-b">
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-800">Aktenansicht: {record.caseNumber}</h2>
+          {record.unfallDatum && (
+            <p className="text-lg text-gray-600">Unfalldatum: {formatDate(record.unfallDatum)}</p>
+          )}
+        </div>
+        <div className="flex-grow ml-12">
+          <label htmlFor="quick-merke" className="block text-sm font-medium text-gray-700 mb-1">
+            Quick-Notes / Merke
+          </label>
+          <textarea
+            id="quick-merke"
+            value={quickMerke}
+            onChange={handleQuickMerkeChange}
+            onBlur={handleQuickMerkeBlur}
+            className="w-full h-20 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Schnelle Notizen hier eingeben..."
+          />
+        </div>
+        <div className="ml-4">
+          <Button onClick={onGoBack}>Zurück zur Übersicht</Button>
+        </div>
       </div>
 
       {/* Overview Section */}
@@ -183,7 +230,24 @@ export const Aktenansicht = ({
 
       {/* Document Management Section */}
       <div>
-        <h3 className="text-xl font-semibold mb-4">Dokumenten- und Notizverwaltung</h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-semibold">Dokumenten- und Notizverwaltung</h3>
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-600">Sortieren:</label>
+            <Button
+              onClick={() => setSortOrder('desc')}
+              className={`px-3 py-1 text-sm rounded-md ${sortOrder === 'desc' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+            >
+              Neueste zuerst
+            </Button>
+            <Button
+              onClick={() => setSortOrder('asc')}
+              className={`px-3 py-1 text-sm rounded-md ${sortOrder === 'asc' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+            >
+              Älteste zuerst
+            </Button>
+          </div>
+        </div>
         <div className="flex items-center gap-4 mb-4">
           <div onDragOver={handleDragOver} onDrop={handleDrop} className="flex-grow border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50 hover:bg-gray-100">
             <p className="text-gray-500">Dateien hierher ziehen</p>
