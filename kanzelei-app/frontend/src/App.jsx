@@ -149,10 +149,10 @@ export const App = () => {
 
         {/* Meldungsanzeige */}
         {message && (
-          <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-6 rounded-lg shadow-sm" role="alert">
+          <div className="fixed bottom-8 right-8 z-50 max-w-sm bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 rounded-lg shadow-lg" role="alert">
             <div className="flex items-center justify-between">
               <span>{message}</span>
-              <button onClick={handleCloseMessage} className="text-blue-700 hover:text-blue-900 font-bold">
+              <button onClick={handleCloseMessage} className="ml-4 text-blue-700 hover:text-blue-900 font-bold">
                 &times;
               </button>
             </div>
