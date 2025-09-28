@@ -46,19 +46,6 @@ export const useKanzleiLogic = () => {
       // This is a client-side migration that prepares the data for the UI.
       // The new structure will be persisted upon the next update to the record.
       const migratedRecords = recordsData.map(record => {
-        // Ensure 'dokumente' and 'notizen' are arrays and add financial fields if missing.
-        const migratedDokumente = (record.dokumente || []).map(doc => ({
-          ...doc,
-          betrag_soll: doc.betrag_soll ?? 0,
-          betrag_haben: doc.betrag_haben ?? 0,
-        }));
-
-        const migratedNotizen = (record.notizen || []).map(note => ({
-          ...note,
-          betrag_soll: note.betrag_soll ?? 0,
-          betrag_haben: note.betrag_haben ?? 0,
-        }));
-
         // First, migrate fristen to aufgaben if fristen exists
         if (record.fristen) {
             record.aufgaben = [...(record.aufgaben || []), ...record.fristen];
@@ -76,13 +63,13 @@ export const useKanzleiLogic = () => {
               details: item.details || '',
             }));
           const notizen = record.notizen.filter(item => !item.datum);
-          return { ...record, aufgaben, notizen: migratedNotizen, dokumente: migratedDokumente };
+          return { ...record, aufgaben, notizen };
         }
         // Ensure aufgaben is at least an empty array to prevent downstream errors
         if (record.aufgaben === undefined) {
-          return { ...record, aufgaben: [], notizen: migratedNotizen, dokumente: migratedDokumente };
+          return { ...record, aufgaben: [] };
         }
-        return { ...record, notizen: migratedNotizen, dokumente: migratedDokumente };
+        return record;
       });
 
       setMandanten(mandantenData);
@@ -220,8 +207,6 @@ export const useKanzleiLogic = () => {
         id: `note_${new Date().getTime()}`,
         akte_id: recordId,
         ...noteData,
-        betrag_soll: 0,
-        betrag_haben: 0,
         autor: 'Sachbearbeiter_A', // Hardcoded as per spec for now
         typ: 'Notiz/Vermerk',
         erstelldatum: now,
