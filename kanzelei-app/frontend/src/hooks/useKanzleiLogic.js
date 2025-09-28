@@ -46,6 +46,19 @@ export const useKanzleiLogic = () => {
       // This is a client-side migration that prepares the data for the UI.
       // The new structure will be persisted upon the next update to the record.
       const migratedRecords = recordsData.map(record => {
+        // Ensure 'dokumente' and 'notizen' are arrays and add financial fields if missing.
+        const migratedDokumente = (record.dokumente || []).map(doc => ({
+          ...doc,
+          betrag_soll: doc.betrag_soll ?? 0,
+          betrag_haben: doc.betrag_haben ?? 0,
+        }));
+
+        const migratedNotizen = (record.notizen || []).map(note => ({
+          ...note,
+          betrag_soll: note.betrag_soll ?? 0,
+          betrag_haben: note.betrag_haben ?? 0,
+        }));
+
         // First, migrate fristen to aufgaben if fristen exists
         if (record.fristen) {
             record.aufgaben = [...(record.aufgaben || []), ...record.fristen];
@@ -63,13 +76,13 @@ export const useKanzleiLogic = () => {
               details: item.details || '',
             }));
           const notizen = record.notizen.filter(item => !item.datum);
-          return { ...record, aufgaben, notizen };
+          return { ...record, aufgaben, notizen: migratedNotizen, dokumente: migratedDokumente };
         }
         // Ensure aufgaben is at least an empty array to prevent downstream errors
         if (record.aufgaben === undefined) {
-          return { ...record, aufgaben: [] };
+          return { ...record, aufgaben: [], notizen: migratedNotizen, dokumente: migratedDokumente };
         }
-        return record;
+        return { ...record, notizen: migratedNotizen, dokumente: migratedDokumente };
       });
 
       setMandanten(mandantenData);
@@ -207,6 +220,8 @@ export const useKanzleiLogic = () => {
         id: `note_${new Date().getTime()}`,
         akte_id: recordId,
         ...noteData,
+        betrag_soll: 0,
+        betrag_haben: 0,
         autor: 'Sachbearbeiter_A', // Hardcoded as per spec for now
         typ: 'Notiz/Vermerk',
         erstelldatum: now,
@@ -231,11 +246,27 @@ export const useKanzleiLogic = () => {
       const recordToUpdate = records.find(r => r.id === recordId);
       if (!recordToUpdate) throw new Error('Akte nicht gefunden');
 
-      const updatedNotizen = recordToUpdate.notizen.map(note =>
-        note.id === noteId
-          ? { ...note, ...noteData, aktualisierungsdatum: new Date().toISOString() }
-          : note
-      );
+      const updatedNotizen = recordToUpdate.notizen.map(note => {
+        if (note.id !== noteId) {
+          return note;
+        }
+
+        // Check if the update is only for financial fields
+        const isOnlyFinancialUpdate =
+          Object.keys(noteData).length > 0 &&
+          Object.keys(noteData).every(
+            key => key === 'betrag_soll' || key === 'betrag_haben'
+          );
+
+        const updatedNote = { ...note, ...noteData };
+
+        // Only update the timestamp if it's not a purely financial edit
+        if (!isOnlyFinancialUpdate) {
+          updatedNote.aktualisierungsdatum = new Date().toISOString();
+        }
+
+        return updatedNote;
+      });
 
       const updatedRecord = {
         ...recordToUpdate,
