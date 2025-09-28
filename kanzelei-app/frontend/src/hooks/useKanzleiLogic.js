@@ -363,6 +363,23 @@ export const useKanzleiLogic = () => {
     }
   };
 
+  const handleUpdateRecord = async (recordId, updatedData) => {
+    try {
+      const recordToUpdate = records.find((r) => r.id === recordId);
+      if (!recordToUpdate) {
+        throw new Error('Akte nicht gefunden');
+      }
+
+      const updatedRecord = { ...recordToUpdate, ...updatedData };
+
+      await api.updateRecord(recordId, updatedRecord);
+      setFlashMessage('Akte erfolgreich aktualisiert.');
+      fetchData();
+    } catch (error) {
+      setFlashMessage(`Fehler beim Aktualisieren der Akte: ${error.message}`);
+    }
+  };
+
   const handleDeleteRecord = async (recordId) => {
     try {
       await api.deleteRecord(recordId);
@@ -415,6 +432,7 @@ export const useKanzleiLogic = () => {
     handleDeleteDritte,
     handleRecordSubmit,
     handleDeleteRecord,
+    handleUpdateRecord,
     handleAddDocuments,
     handleUpdateDocument,
     handleDeleteDocument,
