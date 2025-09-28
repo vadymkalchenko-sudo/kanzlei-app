@@ -32,6 +32,10 @@ export const Aktenansicht = ({
   const [quickMerke, setQuickMerke] = useState(record?.quick_merke || '');
   const [sortOrder, setSortOrder] = useState('desc');
 
+  const toggleSortOrder = () => {
+    setSortOrder(prevOrder => prevOrder === 'desc' ? 'asc' : 'desc');
+  };
+
   const handleQuickMerkeChange = (e) => {
     setQuickMerke(e.target.value);
   };
@@ -179,13 +183,15 @@ export const Aktenansicht = ({
           <label htmlFor="quick-merke" className="block text-sm font-medium text-gray-700 mb-1">
             Quick-Notes / Merke
           </label>
-          <textarea
+          <input
+            type="text"
             id="quick-merke"
             value={quickMerke}
             onChange={handleQuickMerkeChange}
             onBlur={handleQuickMerkeBlur}
-            className="w-full h-20 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Schnelle Notizen hier eingeben..."
+            maxLength={100}
+            className="w-full max-w-md p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Schnelle Notizen (max. 100 Zeichen)"
           />
         </div>
         <div className="ml-4">
@@ -235,21 +241,6 @@ export const Aktenansicht = ({
           <div>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold">Dokumenten- und Notizverwaltung</h3>
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-600">Sortieren:</label>
-                <Button
-                  onClick={() => setSortOrder('desc')}
-                  className={`px-3 py-1 text-sm rounded-md ${sortOrder === 'desc' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
-                >
-                  Neueste zuerst
-                </Button>
-                <Button
-                  onClick={() => setSortOrder('asc')}
-                  className={`px-3 py-1 text-sm rounded-md ${sortOrder === 'asc' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
-                >
-                  Älteste zuerst
-                </Button>
-              </div>
             </div>
             <div className="flex items-center gap-4 mb-4">
               <div onDragOver={handleDragOver} onDrop={handleDrop} className="flex-grow border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50 hover:bg-gray-100">
@@ -267,7 +258,9 @@ export const Aktenansicht = ({
                 <thead className="bg-gray-200">
                   <tr>
                     <th className="px-4 py-2 border-b text-center">Typ</th>
-                    <th className="px-4 py-2 border-b">Datum</th>
+                    <th className="px-4 py-2 border-b cursor-pointer" onClick={toggleSortOrder}>
+                      Datum {sortOrder === 'desc' ? '↓' : '↑'}
+                    </th>
                     <th className="px-4 py-2 border-b">Beschreibung / Titel</th>
                     <th className="px-4 py-2 border-b">Format / Art</th>
                     <th className="px-4 py-2 border-b text-right">Soll</th>

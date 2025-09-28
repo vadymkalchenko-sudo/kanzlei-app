@@ -91,9 +91,9 @@ const AufgabenPanel = ({
     return (
         <div className="bg-gray-50 p-4 rounded-lg shadow-inner h-full">
             <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-semibold text-gray-800">Aufgaben-Management</h3>
-                <Button onClick={() => handleOpenAufgabeModal(null)} className="bg-green-600 hover:bg-green-700">
-                    + Neue Aufgabe
+                <h3 className="text-xl font-semibold text-gray-800">Aufgaben</h3>
+                <Button onClick={() => handleOpenAufgabeModal(null)} className="bg-green-600 hover:bg-green-700 px-3 py-1 text-sm">
+                    + Aufgabe
                 </Button>
             </div>
 
