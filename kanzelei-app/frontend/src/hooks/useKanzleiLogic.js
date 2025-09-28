@@ -243,6 +243,94 @@ export const useKanzleiLogic = () => {
     }
   };
 
+  const handleAddFrist = async (recordId, fristData) => {
+    try {
+      const recordToUpdate = records.find(r => r.id === recordId);
+      if (!recordToUpdate) throw new Error('Akte nicht gefunden');
+
+      const newFrist = {
+        id: `frist_${new Date().getTime()}`,
+        ...fristData,
+        erledigt: false,
+      };
+
+      const updatedRecord = {
+        ...recordToUpdate,
+        fristen: [...(recordToUpdate.fristen || []), newFrist],
+      };
+
+      await api.updateRecord(recordId, updatedRecord);
+      setFlashMessage('Frist erfolgreich hinzugefügt.');
+      fetchData();
+    } catch (error) {
+      setFlashMessage(`Fehler beim Hinzufügen der Frist: ${error.message}`);
+    }
+  };
+
+  const handleUpdateFrist = async (recordId, fristId, fristData) => {
+    try {
+      const recordToUpdate = records.find(r => r.id === recordId);
+      if (!recordToUpdate) throw new Error('Akte nicht gefunden');
+
+      const updatedFristen = recordToUpdate.fristen.map(frist =>
+        frist.id === fristId ? { ...frist, ...fristData } : frist
+      );
+
+      const updatedRecord = {
+        ...recordToUpdate,
+        fristen: updatedFristen,
+      };
+
+      await api.updateRecord(recordId, updatedRecord);
+      setFlashMessage('Frist erfolgreich aktualisiert.');
+      fetchData();
+    } catch (error) {
+      setFlashMessage(`Fehler beim Aktualisieren der Frist: ${error.message}`);
+    }
+  };
+
+  const handleDeleteFrist = async (recordId, fristId) => {
+    try {
+      const recordToUpdate = records.find(r => r.id === recordId);
+      if (!recordToUpdate) throw new Error('Akte nicht gefunden');
+
+      const updatedFristen = recordToUpdate.fristen.filter(frist => frist.id !== fristId);
+
+      const updatedRecord = {
+        ...recordToUpdate,
+        fristen: updatedFristen,
+      };
+
+      await api.updateRecord(recordId, updatedRecord);
+      setFlashMessage('Frist erfolgreich gelöscht.');
+      fetchData();
+    } catch (error) {
+      setFlashMessage(`Fehler beim Löschen der Frist: ${error.message}`);
+    }
+  };
+
+  const handleToggleFrist = async (recordId, fristId) => {
+    try {
+      const recordToUpdate = records.find(r => r.id === recordId);
+      if (!recordToUpdate) throw new Error('Akte nicht gefunden');
+
+      const updatedFristen = recordToUpdate.fristen.map(frist =>
+        frist.id === fristId ? { ...frist, erledigt: !frist.erledigt } : frist
+      );
+
+      const updatedRecord = {
+        ...recordToUpdate,
+        fristen: updatedFristen,
+      };
+
+      await api.updateRecord(recordId, updatedRecord);
+      setFlashMessage('Frist-Status erfolgreich geändert.');
+      fetchData();
+    } catch (error) {
+      setFlashMessage(`Fehler beim Ändern des Frist-Status: ${error.message}`);
+    }
+  };
+
   const handleDeleteDocument = async (recordId, documentId) => {
     try {
       const recordToUpdate = records.find(r => r.id === recordId);
@@ -405,6 +493,10 @@ export const useKanzleiLogic = () => {
     handleAddNote,
     handleUpdateNote,
     handleDeleteNote,
+    handleAddFrist,
+    handleUpdateFrist,
+    handleDeleteFrist,
+    handleToggleFrist,
     fetchData,
     handleExport,
     handleImport,
