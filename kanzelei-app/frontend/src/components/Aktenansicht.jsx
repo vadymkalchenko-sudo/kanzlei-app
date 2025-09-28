@@ -87,6 +87,13 @@ export const Aktenansicht = ({
     return new Blob([byteArray], { type: mimeType });
   };
 
+  const combinedItems = useMemo(() => {
+    const documents = (record?.dokumente || []).map(doc => ({ ...doc, itemType: 'document', date: doc.datum }));
+    const notes = (record?.notizen || []).map(note => ({ ...note, itemType: 'note', date: note.aktualisierungsdatum }));
+
+    return [...documents, ...notes].sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [record?.dokumente, record?.notizen]);
+
   const handleOpenDocument = (doc) => {
     if (!doc.content) {
       alert('Dokumenteninhalt nicht gefunden. Die Datei wurde möglicherweise vor der Inhalts-Speicherung hochgeladen.');
@@ -129,13 +136,6 @@ export const Aktenansicht = ({
   const gegner = record.gegnerId && dritteBeteiligte
     ? dritteBeteiligte.find(d => d.id === record.gegnerId)
     : null;
-
-  const combinedItems = useMemo(() => {
-    const documents = (record.dokumente || []).map(doc => ({ ...doc, itemType: 'document', date: doc.datum }));
-    const notes = (record.notizen || []).map(note => ({ ...note, itemType: 'note', date: note.aktualisierungsdatum }));
-
-    return [...documents, ...notes].sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [record.dokumente, record.notizen]);
 
   return (
     <div className="p-4 bg-white rounded-lg shadow-md">
