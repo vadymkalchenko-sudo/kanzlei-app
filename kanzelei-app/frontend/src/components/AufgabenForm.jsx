@@ -1,21 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/Button.jsx';
 
-const FristenForm = ({ frist, onSubmit, onCancel }) => {
+const AufgabenForm = ({ aufgabe, onSubmit, onCancel }) => {
   const [titel, setTitel] = useState('');
   const [datum, setDatum] = useState('');
+  const [details, setDetails] = useState('');
 
   useEffect(() => {
-    if (frist) {
-      setTitel(frist.titel || '');
-      setDatum(frist.datum ? frist.datum.split('T')[0] : '');
+    if (aufgabe) {
+      setTitel(aufgabe.titel || '');
+      setDatum(aufgabe.datum ? aufgabe.datum.split('T')[0] : '');
+      setDetails(aufgabe.details || '');
     } else {
       setTitel('');
+      setDetails('');
       const today = new Date();
       today.setDate(today.getDate() + 14); // Default to 2 weeks from now
       setDatum(today.toISOString().split('T')[0]);
     }
-  }, [frist]);
+  }, [aufgabe]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -23,12 +26,12 @@ const FristenForm = ({ frist, onSubmit, onCancel }) => {
       alert('Bitte füllen Sie alle Felder aus.');
       return;
     }
-    onSubmit({ titel, datum });
+    onSubmit({ titel, datum, details });
   };
 
   return (
     <form onSubmit={handleSubmit} className="p-4 bg-white rounded-lg shadow-xl w-96">
-      <h2 className="text-xl font-semibold mb-4">{frist ? 'Frist bearbeiten' : 'Neue Frist erstellen'}</h2>
+      <h2 className="text-xl font-semibold mb-4">{aufgabe ? 'Aufgabe bearbeiten' : 'Neue Aufgabe erstellen'}</h2>
       <div className="mb-4">
         <label htmlFor="titel" className="block text-sm font-medium text-gray-700">Titel</label>
         <input
@@ -38,6 +41,16 @@ const FristenForm = ({ frist, onSubmit, onCancel }) => {
           onChange={(e) => setTitel(e.target.value)}
           className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
           required
+        />
+      </div>
+       <div className="mb-4">
+        <label htmlFor="details" className="block text-sm font-medium text-gray-700">Details</label>
+        <textarea
+          id="details"
+          value={details}
+          onChange={(e) => setDetails(e.target.value)}
+          rows="4"
+          className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
         />
       </div>
       <div className="mb-6">
@@ -56,11 +69,11 @@ const FristenForm = ({ frist, onSubmit, onCancel }) => {
           Abbrechen
         </Button>
         <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-          {frist ? 'Speichern' : 'Erstellen'}
+          {aufgabe ? 'Speichern' : 'Erstellen'}
         </Button>
       </div>
     </form>
   );
 };
 
-export default FristenForm;
+export default AufgabenForm;
