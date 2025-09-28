@@ -149,12 +149,8 @@ export const useKanzleiLogic = () => {
         throw new Error('Akte nicht gefunden');
       }
 
-      // Ensure 'soll' and 'haben' are numbers, providing a default of 0 if they are not.
-      const safeSoll = Number(updatedDocData.soll) || 0;
-      const safeHaben = Number(updatedDocData.haben) || 0;
-
       const updatedDocuments = recordToUpdate.dokumente.map(doc =>
-        doc.id === documentId ? { ...doc, ...updatedDocData, soll: safeSoll, haben: safeHaben } : doc
+        doc.id === documentId ? { ...doc, ...updatedDocData } : doc
       );
 
       const updatedRecord = {
@@ -204,41 +200,22 @@ export const useKanzleiLogic = () => {
       const recordToUpdate = records.find(r => r.id === recordId);
       if (!recordToUpdate) throw new Error('Akte nicht gefunden');
 
-      const updatedNotizen = recordToUpdate.notizen.map(note => {
-        if (note.id !== noteId) return note;
+      const updatedNotizen = recordToUpdate.notizen.map(note =>
+        note.id === noteId
+          ? { ...note, ...noteData, aktualisierungsdatum: new Date().toISOString() }
+          : note
+      );
 
-        const updatedNote = { ...note, ...noteData, aktualisierungsdatum: new Date().toISOString() };
-        if (!noteData.datum) {
-          delete updatedNote.datum;
-          delete updatedNote.erledigt;
-        }
-        return updatedNote;
-      });
+      const updatedRecord = {
+        ...recordToUpdate,
+        notizen: updatedNotizen,
+      };
 
-      const updatedRecord = { ...recordToUpdate, notizen: updatedNotizen };
       await api.updateRecord(recordId, updatedRecord);
       setFlashMessage('Notiz erfolgreich aktualisiert.');
       fetchData();
     } catch (error) {
       setFlashMessage(`Fehler beim Aktualisieren der Notiz: ${error.message}`);
-    }
-  };
-
-  const handleToggleNoteErledigt = async (recordId, noteId) => {
-    try {
-      const recordToUpdate = records.find(r => r.id === recordId);
-      if (!recordToUpdate) throw new Error('Akte nicht gefunden');
-
-      const updatedNotizen = recordToUpdate.notizen.map(note =>
-        note.id === noteId ? { ...note, erledigt: !note.erledigt } : note
-      );
-
-      const updatedRecord = { ...recordToUpdate, notizen: updatedNotizen };
-      await api.updateRecord(recordId, updatedRecord);
-      setFlashMessage('Notiz-Status erfolgreich geändert.');
-      fetchData();
-    } catch (error) {
-      setFlashMessage(`Fehler beim Ändern des Notiz-Status: ${error.message}`);
     }
   };
 
@@ -249,11 +226,8 @@ export const useKanzleiLogic = () => {
 
       const updatedNotizen = recordToUpdate.notizen.filter(note => note.id !== noteId);
 
-      // Ensure fristen array is removed from the record
-      const { fristen, ...restOfRecord } = recordToUpdate;
-
       const updatedRecord = {
-        ...restOfRecord,
+        ...recordToUpdate,
         notizen: updatedNotizen,
       };
 
@@ -344,15 +318,12 @@ export const useKanzleiLogic = () => {
 
       if (id) {
         const originalRecord = records.find(r => r.id === id);
-        const { fristen, ...restOfOriginalRecord } = originalRecord;
-        const updatedRecord = { ...restOfOriginalRecord, ...recordData };
-
         if (recordData.status === 'geschlossen' && originalRecord?.status !== 'geschlossen') {
           const clientForArchiving = mandanten.find(m => m.id === mandantId);
-          updatedRecord.archivedMandantData = { ...clientForArchiving };
+          recordData.archivedMandantData = { ...clientForArchiving };
           setFlashMessage('Akte wurde geschlossen und Mandantendaten archiviert.');
         }
-        await api.updateRecord(id, updatedRecord);
+        await api.updateRecord(id, recordData);
         setFlashMessage('Akte erfolgreich aktualisiert!');
       } else {
         const newRecord = { ...recordData, caseNumber: nextCaseNumber };
@@ -428,7 +399,6 @@ export const useKanzleiLogic = () => {
     handleAddNote,
     handleUpdateNote,
     handleDeleteNote,
-    handleToggleNoteErledigt,
     fetchData,
     handleExport,
     handleImport,

@@ -15,8 +15,7 @@ export const Aktenansicht = ({
   onUpdateDocument,
   onAddNote,
   onUpdateNote,
-  onDeleteNote,
-  onToggleNoteErledigt,
+  onDeleteNote
 }) => {
   const fileInputRef = useRef(null);
   const [isEditDocModalOpen, setIsEditDocModalOpen] = useState(false);
@@ -191,7 +190,7 @@ export const Aktenansicht = ({
           <Button onClick={handleFileSelectClick} className="bg-gray-600 hover:bg-gray-700">Oder Dateien auswählen</Button>
           <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" multiple />
           <Button onClick={() => handleOpenNoteModal(null)} className="bg-green-600 hover:bg-green-700">
-            ➕ Add Note / Notiz hinzufügen
+            + Frist / Notiz hinzufügen
           </Button>
         </div>
 
@@ -205,7 +204,6 @@ export const Aktenansicht = ({
                 <th className="px-4 py-2 border-b">Format / Art</th>
                 <th className="px-4 py-2 border-b text-right">Soll</th>
                 <th className="px-4 py-2 border-b text-right">Haben</th>
-                <th className="px-4 py-2 border-b text-center">Erledigt</th>
                 <th className="px-4 py-2 border-b text-center">Aktionen</th>
               </tr>
             </thead>
@@ -215,24 +213,14 @@ export const Aktenansicht = ({
                   <tr
                     key={item.id}
                     onDoubleClick={() => item.itemType === 'document' ? handleOpenDocument(item) : handleOpenNoteModal(item)}
-                    className={`hover:bg-gray-50 cursor-pointer ${item.itemType === 'note' && item.datum && !item.erledigt ? 'bg-red-50' : ''} ${item.itemType === 'note' && item.erledigt ? 'bg-green-100' : ''}`}
+                    className="hover:bg-gray-50 cursor-pointer"
                   >
-                    <td className="px-4 py-2 border-b text-center">{item.itemType === 'document' ? '📄' : (item.datum ? '📅' : '📝')}</td>
-                    <td className="px-4 py-2 border-b">{formatDate(item.datum ? item.datum : item.date)}</td>
+                    <td className="px-4 py-2 border-b text-center">{item.itemType === 'document' ? '📄' : '📝'}</td>
+                    <td className="px-4 py-2 border-b">{formatDate(item.date)}</td>
                     <td className="px-4 py-2 border-b">{item.itemType === 'document' ? item.beschreibung : item.titel}</td>
                     <td className="px-4 py-2 border-b">{item.itemType === 'document' ? simplifyFormat(item) : item.typ}</td>
                     <td className="px-4 py-2 border-b text-right">{item.itemType === 'document' && item.soll ? `${item.soll.toFixed(2)} €` : '–'}</td>
                     <td className="px-4 py-2 border-b text-right">{item.itemType === 'document' && item.haben ? `${item.haben.toFixed(2)} €` : '–'}</td>
-                    <td className="px-4 py-2 border-b text-center">
-                      {item.itemType === 'note' && item.datum ? (
-                        <input
-                          type="checkbox"
-                          checked={!!item.erledigt}
-                          onChange={(e) => { e.stopPropagation(); onToggleNoteErledigt(record.id, item.id); }}
-                          className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                      ) : '–'}
-                    </td>
                     <td className="px-4 py-2 border-b text-center">
                       {item.itemType === 'document' ? (
                         <>
@@ -257,7 +245,7 @@ export const Aktenansicht = ({
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="8" className="text-center py-12 text-gray-500">Keine Dokumente oder Notizen vorhanden.</td></tr>
+                <tr><td colSpan="7" className="text-center py-12 text-gray-500">Keine Dokumente oder Notizen vorhanden.</td></tr>
               )}
             </tbody>
           </table>
