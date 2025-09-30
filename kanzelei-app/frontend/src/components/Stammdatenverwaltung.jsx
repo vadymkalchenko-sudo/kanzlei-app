@@ -15,6 +15,7 @@ export const Stammdatenverwaltung = ({
   onMandantDelete,
   onDritteSubmit,
   onDritteDelete,
+  userRole,
 }) => {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -82,9 +83,11 @@ export const Stammdatenverwaltung = ({
             className="input-field w-full"
           />
         </div>
-        <Button onClick={() => handleOpenModal(null)}>
-          + Neuen {title} anlegen
-        </Button>
+        {userRole !== 'extern' && (
+          <Button onClick={() => handleOpenModal(null)}>
+            + Neuen {title} anlegen
+          </Button>
+        )}
       </div>
 
       <MandantenList

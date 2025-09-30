@@ -224,13 +224,24 @@ export const App = () => {
                             </button>
                             {isDropdownOpen && (
                                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
-                                    <button onClick={onExportClick} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                        Export
-                                    </button>
-                                    <button onClick={onImportClick} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                        Import
-                                    </button>
-                                    {userRole === 'admin' && (
+                                    {(userRole === 'admin' || userRole === 'power_user') && (
+                                        <>
+                                            <button onClick={onExportClick} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                                Export
+                                            </button>
+                                            <button onClick={onImportClick} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                                Import
+                                            </button>
+                                            <input
+                                                type="file"
+                                                ref={importInputRef}
+                                                onChange={onFileImport}
+                                                className="hidden"
+                                                accept="application/json"
+                                            />
+                                        </>
+                                    )}
+                                    {(userRole === 'admin' || userRole === 'power_user') && (
                                         <button
                                             onClick={() => {
                                                 setCurrentView('admin_panel');
@@ -241,13 +252,6 @@ export const App = () => {
                                             Admin Panel
                                         </button>
                                     )}
-                                    <input
-                                        type="file"
-                                        ref={importInputRef}
-                                        onChange={onFileImport}
-                                        className="hidden"
-                                        accept="application/json"
-                                    />
                                 </div>
                             )}
                         </div>
@@ -272,14 +276,16 @@ export const App = () => {
                         <>
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-2xl font-semibold text-gray-700">Aktenübersicht</h2>
-                                <div className="flex items-center">
-                                    <button onClick={() => navigateToStammdaten('mandanten')} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 mr-4">
-                                        Stammdaten verwalten
-                                    </button>
-                                    <button onClick={() => handleOpenAkteModal(null)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105">
-                                        + Neue Akte anlegen
-                                    </button>
-                                </div>
+                                {userRole !== 'extern' && (
+                                    <div className="flex items-center">
+                                        <button onClick={() => navigateToStammdaten('mandanten')} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 mr-4">
+                                            Stammdaten verwalten
+                                        </button>
+                                        <button onClick={() => handleOpenAkteModal(null)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105">
+                                            + Neue Akte anlegen
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Suchleiste */}
@@ -297,6 +303,7 @@ export const App = () => {
                                     records={records}
                                     mandanten={mandanten}
                                     onEdit={handleOpenAkteModal}
+                                    userRole={userRole}
                                 />
                             ) : (
                                 <p className="text-center text-gray-500 py-12">Lade Akten...</p>
@@ -316,6 +323,7 @@ export const App = () => {
                             onMandantDelete={handleDeleteMandant}
                             onDritteSubmit={handleDritteSubmit}
                             onDritteDelete={handleDeleteDritte}
+                            userRole={userRole}
                         />
                     )}
 
@@ -338,6 +346,7 @@ export const App = () => {
                             onUpdateAufgabe={handleUpdateAufgabe}
                             onDeleteAufgabe={handleDeleteAufgabe}
                             onToggleAufgabeErledigt={handleToggleAufgabeErledigt}
+                            userRole={userRole}
                         />
                     )}
 
@@ -363,6 +372,7 @@ export const App = () => {
                             onNavigateToStammdaten={navigateToStammdaten}
                             handleDritteSubmit={handleDritteSubmit}
                             handleMandantSubmit={handleMandantSubmit}
+                            userRole={userRole}
                         />
                     )}
                 </Modal>
