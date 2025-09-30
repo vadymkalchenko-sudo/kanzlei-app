@@ -15,6 +15,7 @@ export const App = () => {
         isAppReady,
         mandanten,
         records,
+        todayDueRecords,
         dritteBeteiligte,
         message,
         setFlashMessage,
@@ -52,6 +53,7 @@ export const App = () => {
     const importInputRef = useRef(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
+    const [showDueTodayOnly, setShowDueTodayOnly] = useState(false);
 
     // Auth state
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -288,23 +290,57 @@ export const App = () => {
                                 )}
                             </div>
 
-                            {/* Suchleiste */}
                             <div className="mb-6">
-                                <input
-                                    type="search"
-                                    placeholder="Suche nach Aktenzeichen oder Mandant..."
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
+                                <label htmlFor="due-today-toggle" className="flex items-center cursor-pointer">
+                                    <div className="relative">
+                                        <input
+                                            type="checkbox"
+                                            id="due-today-toggle"
+                                            className="sr-only"
+                                            checked={showDueTodayOnly}
+                                            onChange={() => setShowDueTodayOnly(!showDueTodayOnly)}
+                                        />
+                                        <div className={`block w-12 h-6 rounded-full transition-colors ${showDueTodayOnly ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 ${showDueTodayOnly ? 'transform translate-x-6' : ''}`}></div>
+                                    </div>
+                                    <div className="ml-3 text-gray-700 font-medium">
+                                        Heute fällige Fristen
+                                    </div>
+                                </label>
                             </div>
 
+                            {/* Suchleiste */}
+                            {!showDueTodayOnly && (
+                                <div className="mb-6">
+                                    <input
+                                        type="search"
+                                        placeholder="Suche nach Aktenzeichen oder Mandant..."
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                            )}
+
                             {isAppReady ? (
-                                <AktenList
-                                    records={records}
-                                    mandanten={mandanten}
-                                    onEdit={handleOpenAkteModal}
-                                    userRole={userRole}
-                                />
+                                showDueTodayOnly ? (
+                                    todayDueRecords.length > 0 ? (
+                                        <AktenList
+                                            records={todayDueRecords}
+                                            mandanten={mandanten}
+                                            onEdit={handleOpenAkteModal}
+                                            userRole={userRole}
+                                        />
+                                    ) : (
+                                        <p className="text-center text-gray-500 py-12">Fantastisch! Es sind keine Akten mit Fristen bis heute oder früher offen.</p>
+                                    )
+                                ) : (
+                                    <AktenList
+                                        records={records}
+                                        mandanten={mandanten}
+                                        onEdit={handleOpenAkteModal}
+                                        userRole={userRole}
+                                    />
+                                )
                             ) : (
                                 <p className="text-center text-gray-500 py-12">Lade Akten...</p>
                             )}

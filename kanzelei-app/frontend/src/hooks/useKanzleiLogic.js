@@ -116,6 +116,36 @@ export const useKanzleiLogic = () => {
     });
   }, [searchTerm, records, mandanten]);
 
+  const todayDueRecords = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+
+    const recordsWithDueTasks = records.map(record => {
+      const openTasks = record.aufgaben?.filter(aufgabe => {
+        if (aufgabe.erledigt) return false;
+        const deadline = new Date(aufgabe.deadline);
+        return deadline <= today;
+      }) || [];
+
+      if (openTasks.length === 0) {
+        return null;
+      }
+
+      // Find the oldest deadline among the open tasks for this record
+      const oldestDeadline = openTasks.reduce((oldest, current) => {
+        const currentDate = new Date(current.deadline);
+        return currentDate < oldest ? currentDate : oldest;
+      }, new Date(openTasks[0].deadline));
+
+      return { ...record, oldestDeadline };
+    }).filter(Boolean); // Remove null entries
+
+    // Sort the records by the oldest deadline, most overdue first
+    recordsWithDueTasks.sort((a, b) => a.oldestDeadline - b.oldestDeadline);
+
+    return recordsWithDueTasks;
+  }, [records]);
+
   useEffect(() => {
     const controller = new AbortController();
     fetchData(controller.signal);
@@ -587,6 +617,7 @@ export const useKanzleiLogic = () => {
   return {
     isAppReady,
     records: filteredRecords, // Pass filtered records to the UI
+    todayDueRecords,
     mandanten,
     dritteBeteiligte,
     message,
