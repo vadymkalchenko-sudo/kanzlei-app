@@ -16,53 +16,63 @@ const apiRequest = async (url, options = {}) => {
     const response = await fetch(url, options);
     return handleResponse(response);
   } catch (error) {
+    if (error.name === 'AbortError') {
+      // Ignore abort errors, as they are expected during component unmounts
+      return;
+    }
     console.error('API request failed:', error);
     throw error;
   }
 };
 
 // Mandanten API
-export const getMandanten = () => apiRequest(`${API_BASE_URL}/mandanten`);
-export const createMandant = (data) => apiRequest(`${API_BASE_URL}/mandanten`, {
+export const getMandanten = (signal) => apiRequest(`${API_BASE_URL}/mandanten`, { signal });
+export const createMandant = (data, signal) => apiRequest(`${API_BASE_URL}/mandanten`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(data),
+  signal,
 });
-export const updateMandant = (id, data) => apiRequest(`${API_BASE_URL}/mandanten/${id}`, {
+export const updateMandant = (id, data, signal) => apiRequest(`${API_BASE_URL}/mandanten/${id}`, {
   method: 'PUT',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(data),
+  signal,
 });
-export const deleteMandant = (id) => apiRequest(`${API_BASE_URL}/mandanten/${id}`, { method: 'DELETE' });
+export const deleteMandant = (id, signal) => apiRequest(`${API_BASE_URL}/mandanten/${id}`, { method: 'DELETE', signal });
 
 // Dritte Beteiligte API
-export const getDritteBeteiligte = () => apiRequest(`${API_BASE_URL}/dritte-beteiligte`);
-export const createDritteBeteiligte = (data) => apiRequest(`${API_BASE_URL}/dritte-beteiligte`, {
+export const getDritteBeteiligte = (signal) => apiRequest(`${API_BASE_URL}/dritte-beteiligte`, { signal });
+export const createDritteBeteiligte = (data, signal) => apiRequest(`${API_BASE_URL}/dritte-beteiligte`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(data),
+  signal,
 });
-export const updateDritteBeteiligte = (id, data) => apiRequest(`${API_BASE_URL}/dritte-beteiligte/${id}`, {
+export const updateDritteBeteiligte = (id, data, signal) => apiRequest(`${API_BASE_URL}/dritte-beteiligte/${id}`, {
   method: 'PUT',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(data),
+  signal,
 });
-export const deleteDritteBeteiligte = (id) => apiRequest(`${API_BASE_URL}/dritte-beteiligte/${id}`, { method: 'DELETE' });
+export const deleteDritteBeteiligte = (id, signal) => apiRequest(`${API_BASE_URL}/dritte-beteiligte/${id}`, { method: 'DELETE', signal });
 
 
 // Akten API
-export const getRecords = () => apiRequest(`${API_BASE_URL}/records`);
-export const createRecord = (data) => apiRequest(`${API_BASE_URL}/records`, {
+export const getRecords = (signal) => apiRequest(`${API_BASE_URL}/records`, { signal });
+export const createRecord = (data, signal) => apiRequest(`${API_BASE_URL}/records`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
+    signal,
 });
-export const updateRecord = (id, data) => apiRequest(`${API_BASE_URL}/records/${id}`, {
+export const updateRecord = (id, data, signal) => apiRequest(`${API_BASE_URL}/records/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
+    signal,
 });
-export const deleteRecord = (id) => apiRequest(`${API_BASE_URL}/records/${id}`, { method: 'DELETE' });
+export const deleteRecord = (id, signal) => apiRequest(`${API_BASE_URL}/records/${id}`, { method: 'DELETE', signal });
 
 // This is a placeholder, as the backend does not have backup/restore endpoints
 export const exportData = async () => {
