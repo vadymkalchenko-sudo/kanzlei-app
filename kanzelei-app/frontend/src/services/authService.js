@@ -1,9 +1,10 @@
-export const ROLES = ['admin', 'user', 'extern'];
+export const ROLES = ['admin', 'power_user', 'user', 'extern'];
 
 let mockUsers = [
     { id: 1, username: 'admin', password: 'password', role: 'admin', status: 'active', createdAt: new Date().toISOString() },
-    { id: 2, username: 'user', password: 'password', role: 'user', status: 'active', createdAt: new Date().toISOString() },
-    { id: 3, username: 'extern', password: 'password', role: 'extern', status: 'inactive', createdAt: new Date().toISOString() },
+    { id: 2, username: 'power_user', password: 'password', role: 'power_user', status: 'active', createdAt: new Date().toISOString() },
+    { id: 3, username: 'user', password: 'password', role: 'user', status: 'active', createdAt: new Date().toISOString() },
+    { id: 4, username: 'extern', password: 'password', role: 'extern', status: 'inactive', createdAt: new Date().toISOString() },
 ];
 
 export const getUsers = () => {

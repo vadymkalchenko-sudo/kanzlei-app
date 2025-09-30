@@ -5,8 +5,12 @@ import React from 'react';
  * @param {object[]} mandanten - Die Liste der anzuzeigenden Mandanten.
  * @param {function} onEdit - Die Callback-Funktion zum Bearbeiten eines Mandanten.
  * @param {function} onDelete - Die Callback-Funktion zum Löschen eines Mandanten.
+ * @param {string} userRole - The role of the current user.
  */
-export const MandantenList = ({ mandanten, onEdit, onDelete }) => {
+export const MandantenList = ({ mandanten, onEdit, onDelete, userRole }) => {
+  const canEdit = userRole === 'admin' || userRole === 'power_user' || userRole === 'user';
+  const canDelete = userRole === 'admin' || userRole === 'power_user';
+
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       <table className="min-w-full table-auto">
@@ -21,9 +25,11 @@ export const MandantenList = ({ mandanten, onEdit, onDelete }) => {
             <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
               Adresse
             </th>
-            <th className="px-6 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider">
-              Aktionen
-            </th>
+            {(canEdit || canDelete) && (
+              <th className="px-6 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider">
+                Aktionen
+              </th>
+            )}
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
@@ -38,20 +44,26 @@ export const MandantenList = ({ mandanten, onEdit, onDelete }) => {
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {`${mandant.street || ''} ${mandant.zipCode || ''} ${mandant.city || ''}`.trim()}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <button
-                  onClick={() => onEdit(mandant)}
-                  className="text-indigo-600 hover:text-indigo-900 font-semibold px-2 py-1 rounded-lg hover:bg-indigo-100 transition-colors duration-200 mr-2"
-                >
-                  Bearbeiten
-                </button>
-                <button
-                  onClick={() => onDelete(mandant.id)}
-                  className="text-red-600 hover:text-red-900 font-semibold px-2 py-1 rounded-lg hover:bg-red-100 transition-colors duration-200"
-                >
-                  Löschen
-                </button>
-              </td>
+              {(canEdit || canDelete) && (
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  {canEdit && (
+                    <button
+                      onClick={() => onEdit(mandant)}
+                      className="text-indigo-600 hover:text-indigo-900 font-semibold px-2 py-1 rounded-lg hover:bg-indigo-100 transition-colors duration-200 mr-2"
+                    >
+                      Bearbeiten
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      onClick={() => onDelete(mandant.id)}
+                      className="text-red-600 hover:text-red-900 font-semibold px-2 py-1 rounded-lg hover:bg-red-100 transition-colors duration-200"
+                    >
+                      Löschen
+                    </button>
+                  )}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

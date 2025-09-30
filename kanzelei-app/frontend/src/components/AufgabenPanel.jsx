@@ -18,11 +18,15 @@ const AufgabenPanel = ({
     onAddAufgabe,
     onUpdateAufgabe,
     onDeleteAufgabe,
-    onToggleAufgabeErledigt
+    onToggleAufgabeErledigt,
+    userRole
 }) => {
     const [activeTab, setActiveTab] = useState('active'); // 'active' or 'history'
     const [isAufgabeModalOpen, setIsAufgabeModalOpen] = useState(false);
     const [selectedAufgabe, setSelectedAufgabe] = useState(null);
+
+    const canEdit = userRole === 'admin' || userRole === 'power_user' || userRole === 'user';
+    const canDelete = userRole === 'admin' || userRole === 'power_user';
 
     const handleOpenAufgabeModal = (aufgabe = null) => {
         setSelectedAufgabe(aufgabe);
@@ -58,7 +62,7 @@ const AufgabenPanel = ({
         <div className={`p-3 mb-2 rounded-md flex items-center justify-between ${isHistory ? 'bg-green-100' : 'bg-red-50'}`}>
             <div className="flex-grow">
                 <div className="flex items-start">
-                    {!isHistory && (
+                    {!isHistory && canEdit && (
                         <input
                             type="checkbox"
                             checked={!!aufgabe.erledigt}
@@ -76,14 +80,20 @@ const AufgabenPanel = ({
                     </div>
                 </div>
             </div>
-            <div className="flex items-center ml-4">
-                <button onClick={() => handleOpenAufgabeModal(aufgabe)} className="p-1 text-blue-600 hover:text-blue-800" title="Bearbeiten">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
-                </button>
-                <button onClick={() => onDeleteAufgabe(recordId, aufgabe.id)} className="p-1 text-red-600 hover:text-red-800 ml-2" title="Löschen">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                </button>
-            </div>
+            {(canEdit || canDelete) && (
+                <div className="flex items-center ml-4">
+                    {canEdit && (
+                        <button onClick={() => handleOpenAufgabeModal(aufgabe)} className="p-1 text-blue-600 hover:text-blue-800" title="Bearbeiten">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
+                        </button>
+                    )}
+                    {canDelete && (
+                        <button onClick={() => onDeleteAufgabe(recordId, aufgabe.id)} className="p-1 text-red-600 hover:text-red-800 ml-2" title="Löschen">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                    )}
+                </div>
+            )}
         </div>
     );
 
@@ -92,9 +102,11 @@ const AufgabenPanel = ({
         <div className="bg-gray-50 p-4 rounded-lg shadow-inner h-full">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-semibold text-gray-800">Aufgaben</h3>
-                <Button onClick={() => handleOpenAufgabeModal(null)} className="bg-green-600 hover:bg-green-700 px-3 py-1 text-sm">
-                    + Aufgabe
-                </Button>
+                {canEdit && (
+                    <Button onClick={() => handleOpenAufgabeModal(null)} className="bg-green-600 hover:bg-green-700 px-3 py-1 text-sm">
+                        + Aufgabe
+                    </Button>
+                )}
             </div>
 
             {/* Tabs */}
