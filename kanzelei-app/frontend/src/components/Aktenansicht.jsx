@@ -136,14 +136,24 @@ export const Aktenansicht = ({
     handleCloseNoteModal();
   };
 
-  const base64ToBlob = (base64, mimeType) => {
-    const byteCharacters = atob(base64.split(',')[1]);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
+  const base64ToBlob = async (base64, mimeType) => {
+    try {
+        const response = await fetch(base64);
+        const blob = await response.blob();
+        return blob;
+    } catch (error) {
+        console.error('Error converting base64 to Blob:', error);
+        // Fallback for environments that might not support fetching data URIs directly
+        // Or for specific browser quirks. This is a more robust version of the original.
+        const safeBase64 = base64.split(',')[1] || base64;
+        const byteCharacters = atob(safeBase64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        return new Blob([byteArray], { type: mimeType });
     }
-    const byteArray = new Uint8Array(byteNumbers);
-    return new Blob([byteArray], { type: mimeType });
   };
 
   const combinedItems = useMemo(() => {
@@ -170,20 +180,25 @@ export const Aktenansicht = ({
     }, 0);
   }, [combinedItems]);
 
-  const handleOpenDocument = (doc) => {
+  const handleOpenDocument = async (doc) => {
     if (!doc.content) {
       alert('Dokumenteninhalt nicht gefunden. Die Datei wurde möglicherweise vor der Inhalts-Speicherung hochgeladen.');
       return;
     }
-    const blob = base64ToBlob(doc.content, doc.format);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = doc.beschreibung || 'dokument';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+        const blob = await base64ToBlob(doc.content, doc.format);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = doc.beschreibung || 'dokument';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error("Fehler beim Öffnen des Dokuments:", error);
+        alert("Das Dokument konnte nicht geöffnet werden. Bitte überprüfen Sie die Konsole für weitere Details.");
+    }
   };
 
   if (!record || !mandant) {
@@ -198,6 +213,10 @@ export const Aktenansicht = ({
   const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+        console.warn('Invalid date string received:', dateString);
+        return 'Ungültiges Datum';
+    }
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
