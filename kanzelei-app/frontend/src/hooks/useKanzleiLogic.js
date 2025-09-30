@@ -34,13 +34,19 @@ export const useKanzleiLogic = () => {
     }
   };
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (signal) => {
     try {
       const [mandantenData, recordsData, dritteData] = await Promise.all([
-        api.getMandanten(),
-        api.getRecords(),
-        api.getDritteBeteiligte(),
+        api.getMandanten(signal),
+        api.getRecords(signal),
+        api.getDritteBeteiligte(signal),
       ]);
+
+      // If the request was aborted, the API calls will return undefined.
+      // We should not proceed with state updates if that's the case.
+      if (!mandantenData || !recordsData || !dritteData) {
+        return;
+      }
 
       // MIGRATE DATA: If a record has notes but no 'aufgaben' array, separate them.
       // This is a client-side migration that prepares the data for the UI.
@@ -89,7 +95,9 @@ export const useKanzleiLogic = () => {
       setRecords(migratedRecords);
       setDritteBeteiligte(dritteData);
     } catch (error) {
-      setFlashMessage(`Fehler beim Laden der Daten: ${error.message}`);
+      if (error.name !== 'AbortError') {
+        setFlashMessage(`Fehler beim Laden der Daten: ${error.message}`);
+      }
     } finally {
       setIsAppReady(true);
     }
@@ -109,7 +117,12 @@ export const useKanzleiLogic = () => {
   }, [searchTerm, records, mandanten]);
 
   useEffect(() => {
-    fetchData();
+    const controller = new AbortController();
+    fetchData(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
   }, [fetchData]);
 
   const handleMandantSubmit = async (mandantData, options = { showMessage: true, fetchData: true }) => {
