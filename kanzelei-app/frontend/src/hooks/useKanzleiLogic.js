@@ -121,26 +121,38 @@ export const useKanzleiLogic = () => {
     today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
 
     const recordsWithDueTasks = records.map(record => {
-      const openTasks = record.aufgaben?.filter(aufgabe => {
-        if (aufgabe.erledigt) return false;
-        const deadline = new Date(aufgabe.deadline);
-        return deadline <= today;
-      }) || [];
+        // Safely access aufgaben, defaulting to an empty array.
+        const aufgaben = record.aufgaben || [];
 
-      if (openTasks.length === 0) {
-        return null;
-      }
+        const openTasks = aufgaben.filter(aufgabe => {
+            if (aufgabe.erledigt) {
+                return false;
+            }
+            // A task must have a deadline to be considered.
+            // It can be under the property 'deadline' or 'datum'.
+            const deadlineDate = aufgabe.deadline || aufgabe.datum;
+            if (!deadlineDate) {
+                return false;
+            }
+            const deadline = new Date(deadlineDate);
+            return deadline <= today;
+        });
 
-      // Find the oldest deadline among the open tasks for this record
-      const oldestDeadline = openTasks.reduce((oldest, current) => {
-        const currentDate = new Date(current.deadline);
-        return currentDate < oldest ? currentDate : oldest;
-      }, new Date(openTasks[0].deadline));
+        if (openTasks.length === 0) {
+            return null;
+        }
 
-      return { ...record, oldestDeadline };
-    }).filter(Boolean); // Remove null entries
+        // Find the oldest deadline among the open tasks for sorting purposes.
+        const oldestDeadline = openTasks.reduce((oldest, current) => {
+            const currentDate = new Date(current.deadline || current.datum);
+            return currentDate < oldest ? currentDate : oldest;
+        }, new Date(openTasks[0].deadline || openTasks[0].datum));
 
-    // Sort the records by the oldest deadline, most overdue first
+        // Return the record along with its most critical deadline.
+        return { ...record, oldestDeadline };
+    }).filter(Boolean); // Filter out records with no overdue tasks.
+
+    // Sort records so that those with the most overdue tasks appear first.
     recordsWithDueTasks.sort((a, b) => a.oldestDeadline - b.oldestDeadline);
 
     return recordsWithDueTasks;
