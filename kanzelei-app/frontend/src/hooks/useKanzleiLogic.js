@@ -547,15 +547,27 @@ export const useKanzleiLogic = () => {
 
       if (id) {
         const originalRecord = records.find(r => r.id === id);
-        if (recordData.status === 'geschlossen' && originalRecord?.status !== 'geschlossen') {
+        if (!originalRecord) {
+          throw new Error("Original record not found for update.");
+        }
+
+        const updatedRecord = { ...originalRecord, ...recordData };
+
+        if (updatedRecord.status === 'geschlossen' && originalRecord?.status !== 'geschlossen') {
           const clientForArchiving = mandanten.find(m => m.id === mandantId);
-          recordData.archivedMandantData = { ...clientForArchiving };
+          updatedRecord.archivedMandantData = { ...clientForArchiving };
           setFlashMessage('Akte wurde geschlossen und Mandantendaten archiviert.');
         }
-        await api.updateRecord(id, recordData);
+        await api.updateRecord(id, updatedRecord);
         setFlashMessage('Akte erfolgreich aktualisiert!');
       } else {
-        const newRecord = { ...recordData, caseNumber: nextCaseNumber };
+        const newRecord = {
+            ...recordData,
+            caseNumber: nextCaseNumber,
+            dokumente: [],
+            notizen: [],
+            aufgaben: [],
+        };
         await api.createRecord(newRecord);
         if (clientJustCreated) {
           setFlashMessage('Neuer Mandant und Akte erfolgreich angelegt!');
