@@ -56,8 +56,8 @@ export const App = () => {
     const [showDueTodayOnly, setShowDueTodayOnly] = useState(false);
 
     // Auth state
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [userRole, setUserRole] = useState(null);
+    const [isLoggedIn, setIsLoggedIn] = useState(true);
+    const [userRole, setUserRole] = useState('admin');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
 
