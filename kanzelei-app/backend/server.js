@@ -60,15 +60,18 @@ app.post('/api/login', (req, res) => {
 
 // Generische CRUD-Fabrik für alle Entitäten
 const createCrudEndpoints = (router, storageDir, entityName) => {
+    const fsp = require('fs').promises;
+
     // POST create
-    router.post('/', (req, res) => {
+    router.post('/', async (req, res) => {
         try {
+            await fsp.mkdir(storageDir, { recursive: true });
             const newItem = req.body;
             if (!newItem.id) {
                 newItem.id = crypto.randomUUID();
             }
             const filePath = path.join(storageDir, `${newItem.id}.json`);
-            fs.writeFileSync(filePath, JSON.stringify(newItem, null, 2), 'utf-8');
+            await fsp.writeFile(filePath, JSON.stringify(newItem, null, 2), 'utf-8');
             console.log(`${entityName} erfolgreich erstellt: ${filePath}`);
             res.status(201).json(newItem);
         } catch (err) {
@@ -78,69 +81,76 @@ const createCrudEndpoints = (router, storageDir, entityName) => {
     });
 
     // GET all
-    router.get('/', (req, res) => {
+    router.get('/', async (req, res) => {
         try {
-            const files = fs.readdirSync(storageDir).filter(file => file.endsWith('.json'));
-            const items = files.map(file => {
+            const files = await fsp.readdir(storageDir);
+            const jsonFiles = files.filter(file => file.endsWith('.json'));
+            const items = await Promise.all(jsonFiles.map(async (file) => {
                 const filePath = path.join(storageDir, file);
-                return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-            });
+                const fileContent = await fsp.readFile(filePath, 'utf-8');
+                return JSON.parse(fileContent);
+            }));
             res.json(items);
         } catch (err) {
+            if (err.code === 'ENOENT') {
+                // If directory doesn't exist, return an empty array.
+                return res.json([]);
+            }
             console.error(`Fehler beim Lesen der ${entityName}:`, err);
             res.status(500).json({ error: `Fehler beim Lesen der ${entityName}` });
         }
     });
 
     // GET by id
-    router.get('/:id', (req, res) => {
+    router.get('/:id', async (req, res) => {
         try {
             const filePath = path.join(storageDir, `${req.params.id}.json`);
-            if (fs.existsSync(filePath)) {
-                const item = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-                res.json(item);
-            } else {
-                res.status(404).json({ error: `${entityName} nicht gefunden` });
-            }
+            const fileContent = await fsp.readFile(filePath, 'utf-8');
+            res.json(JSON.parse(fileContent));
         } catch (err) {
-            console.error(`Fehler beim Lesen von ${entityName}:`, err);
-            res.status(500).json({ error: `Fehler beim Lesen von ${entityName}` });
+            if (err.code === 'ENOENT') {
+                res.status(404).json({ error: `${entityName} nicht gefunden` });
+            } else {
+                console.error(`Fehler beim Lesen von ${entityName}:`, err);
+                res.status(500).json({ error: `Fehler beim Lesen von ${entityName}` });
+            }
         }
     });
 
     // PUT update
-    router.put('/:id', (req, res) => {
+    router.put('/:id', async (req, res) => {
         try {
             const filePath = path.join(storageDir, `${req.params.id}.json`);
-            if (fs.existsSync(filePath)) {
-                const updatedItem = req.body;
-                updatedItem.id = req.params.id;
-                fs.writeFileSync(filePath, JSON.stringify(updatedItem, null, 2), 'utf-8');
-                console.log(`${entityName} erfolgreich aktualisiert: ${filePath}`);
-                res.json(updatedItem);
-            } else {
-                res.status(404).json({ error: `${entityName} nicht gefunden` });
-            }
+            await fsp.access(filePath); // Check if file exists
+            const updatedItem = req.body;
+            updatedItem.id = req.params.id;
+            await fsp.writeFile(filePath, JSON.stringify(updatedItem, null, 2), 'utf-8');
+            console.log(`${entityName} erfolgreich aktualisiert: ${filePath}`);
+            res.json(updatedItem);
         } catch (err) {
-            console.error(`Fehler beim Aktualisieren von ${entityName}:`, err);
-            res.status(500).json({ error: `Fehler beim Aktualisieren von ${entityName}` });
+            if (err.code === 'ENOENT') {
+                res.status(404).json({ error: `${entityName} nicht gefunden` });
+            } else {
+                console.error(`Fehler beim Aktualisieren von ${entityName}:`, err);
+                res.status(500).json({ error: `Fehler beim Aktualisieren von ${entityName}` });
+            }
         }
     });
 
     // DELETE
-    router.delete('/:id', (req, res) => {
+    router.delete('/:id', async (req, res) => {
         try {
             const filePath = path.join(storageDir, `${req.params.id}.json`);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-                console.log(`${entityName} erfolgreich gelöscht: ${filePath}`);
-                res.status(204).send();
-            } else {
-                res.status(404).json({ error: `${entityName} nicht gefunden` });
-            }
+            await fsp.unlink(filePath);
+            console.log(`${entityName} erfolgreich gelöscht: ${filePath}`);
+            res.status(204).send();
         } catch (err) {
-            console.error(`Fehler beim Löschen von ${entityName}:`, err);
-            res.status(500).json({ error: `Fehler beim Löschen von ${entityName}` });
+            if (err.code === 'ENOENT') {
+                res.status(404).json({ error: `${entityName} nicht gefunden` });
+            } else {
+                console.error(`Fehler beim Löschen von ${entityName}:`, err);
+                res.status(500).json({ error: `Fehler beim Löschen von ${entityName}` });
+            }
         }
     });
 };
