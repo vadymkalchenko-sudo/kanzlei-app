@@ -10,12 +10,16 @@ const port = 3001;
 app.use(cors()); // Allow all origins
 app.use(express.json({ limit: '50mb' }));
 
-const basePath = '/app/kanzlei-data';
+const basePath = process.env.DATA_PATH || '/app/kanzlei-data';
 console.log('Application will write to:', basePath);
 
 const initializeData = () => {
     const initialDataPath = path.join(__dirname, 'initial-data');
-    const directories = ['records', 'mandanten', 'dritte-beteiligte'];
+    const directories = [
+        'akten',
+        'stammdaten/mandanten',
+        'stammdaten/dritteBeteiligte'
+    ];
 
     directories.forEach(dir => {
         const fullPath = path.join(basePath, dir);
@@ -24,26 +28,37 @@ const initializeData = () => {
         }
     });
 
-    const copyInitialFile = (sourceFile, destFile) => {
+    const copyInitialFile = (sourceFile, destDir, destFile) => {
         const sourcePath = path.join(initialDataPath, sourceFile);
-        const destPath = path.join(basePath, destFile);
+        const destPath = path.join(basePath, destDir, destFile);
         if (!fs.existsSync(destPath) && fs.existsSync(sourcePath)) {
             fs.copyFileSync(sourcePath, destPath);
         }
     }
 
-    copyInitialFile('mandant1.json', path.join('mandanten', 'mandant-1.json'));
-    copyInitialFile('gegner1.json', path.join('dritte-beteiligte', 'gegner-1.json'));
-    copyInitialFile('akte1.json', path.join('records', 'akte-1.json'));
-    copyInitialFile('akte2.json', path.join('records', 'akte-2.json'));
-    copyInitialFile('akte3.json', path.join('records', 'akte-3.json'));
+    copyInitialFile('mandant1.json', 'stammdaten/mandanten', 'mandant-1.json');
+    copyInitialFile('gegner1.json', 'stammdaten/dritteBeteiligte', 'gegner-1.json');
+    copyInitialFile('akte1.json', 'akten', 'akte-1.json');
+    copyInitialFile('akte2.json', 'akten', 'akte-2.json');
+    copyInitialFile('akte3.json', 'akten', 'akte-3.json');
 
     console.log('Initial data successfully loaded into the file system.');
 };
 
 initializeData();
 
-// Generische CRUD-Fabrik für alle Entitäten (Records, Mandanten, Dritte Beteiligte)
+// Temporary login bypass
+app.post('/api/login', (req, res) => {
+    res.json({
+        success: true,
+        user: {
+            name: 'Test User',
+            roles: ['admin']
+        }
+    });
+});
+
+// Generische CRUD-Fabrik für alle Entitäten
 const createCrudEndpoints = (router, storageDir, entityName) => {
     // POST create
     router.post('/', (req, res) => {
@@ -131,17 +146,17 @@ const createCrudEndpoints = (router, storageDir, entityName) => {
 };
 
 // Erstelle Router für jeden Entitätstyp
-const recordsRouter = express.Router();
-createCrudEndpoints(recordsRouter, path.join(basePath, 'records'), 'Akte');
-app.use('/api/records', recordsRouter);
+const aktenRouter = express.Router();
+createCrudEndpoints(aktenRouter, path.join(basePath, 'akten'), 'Akte');
+app.use('/api/akten', aktenRouter);
 
 const mandantenRouter = express.Router();
-createCrudEndpoints(mandantenRouter, path.join(basePath, 'mandanten'), 'Mandant');
-app.use('/api/mandanten', mandantenRouter);
+createCrudEndpoints(mandantenRouter, path.join(basePath, 'stammdaten/mandanten'), 'Mandant');
+app.use('/api/stammdaten/mandanten', mandantenRouter);
 
 const dritteRouter = express.Router();
-createCrudEndpoints(dritteRouter, path.join(basePath, 'dritte-beteiligte'), 'Dritter Beteiligter');
-app.use('/api/dritte-beteiligte', dritteRouter);
+createCrudEndpoints(dritteRouter, path.join(basePath, 'stammdaten/dritteBeteiligte'), 'Dritter Beteiligter');
+app.use('/api/stammdaten/dritteBeteiligte', dritteRouter);
 
 app.listen(port, () => {
     console.log(`API-Server läuft auf http://localhost:${port}`);
