@@ -2,16 +2,20 @@ version: '3.8'
 
 services:
   backend:
+    container_name: kanzlei_backend_dev
     build:
       context: ./backend
       dockerfile: Dockerfile
     ports:
       - "3001:3001"
     volumes:
-      - ./backend/kanzlei-data:/app/kanzlei-data
+      - ./data:/app/kanzlei-data
+    environment:
+      - DATA_PATH=/app/kanzlei-data
     command: npm start
 
   frontend:
+    container_name: kanzlei_frontend_dev
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -21,6 +25,3 @@ services:
       - backend
     environment:
       - VITE_API_BASE_URL=http://backend:3001
-
-volumes:
-  kanzlei-data:
