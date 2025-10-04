@@ -32,7 +32,7 @@ app.post('/api/login', (req, res) => {
     });
 });
 
-const createCrudEndpoints = (router, tableName) => {
+const createCrudEndpoints = (router, tableName, jsonbColumns = []) => {
     // POST create
     router.post('/', async (req, res) => {
         try {
@@ -40,6 +40,13 @@ const createCrudEndpoints = (router, tableName) => {
             if (!newItem.id) {
                 newItem.id = crypto.randomUUID();
             }
+
+            // Stringify JSONB columns before insert
+            jsonbColumns.forEach(key => {
+                if (newItem[key] && typeof newItem[key] === 'object') {
+                    newItem[key] = JSON.stringify(newItem[key]);
+                }
+            });
 
             const columns = Object.keys(newItem).map(key => `"${key}"`).join(', ');
             const values = Object.values(newItem);
@@ -89,6 +96,13 @@ const createCrudEndpoints = (router, tableName) => {
             const itemFromRequest = req.body;
             delete itemFromRequest.id;
 
+            // Stringify JSONB columns before update
+            jsonbColumns.forEach(key => {
+                if (itemFromRequest[key] && typeof itemFromRequest[key] === 'object') {
+                    itemFromRequest[key] = JSON.stringify(itemFromRequest[key]);
+                }
+            });
+
             const columns = Object.keys(itemFromRequest).map((key, i) => `"${key}" = $${i + 2}`).join(', ');
             const values = [id, ...Object.values(itemFromRequest)];
 
@@ -126,7 +140,7 @@ const createCrudEndpoints = (router, tableName) => {
 
 // Erstelle Router für jeden Entitätstyp
 const aktenRouter = express.Router();
-createCrudEndpoints(aktenRouter, 'akten');
+createCrudEndpoints(aktenRouter, 'akten', ['dokumente', 'aufgaben', 'notizen', 'fristen']);
 app.use('/api/records', aktenRouter);
 
 const mandantenRouter = express.Router();
