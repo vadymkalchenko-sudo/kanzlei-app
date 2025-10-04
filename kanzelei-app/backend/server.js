@@ -158,17 +158,46 @@ const initializeDatabase = async () => {
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS mandanten (
-                id TEXT PRIMARY KEY, name TEXT, street TEXT, "zipCode" TEXT, city TEXT, email TEXT, kontakte JSONB, historie JSONB
+                id TEXT PRIMARY KEY,
+                anrede TEXT,
+                name TEXT,
+                street TEXT,
+                "zipCode" TEXT,
+                city TEXT,
+                email TEXT,
+                kontakte JSONB,
+                historie JSONB
             );
         `);
         await client.query(`
             CREATE TABLE IF NOT EXISTS gegner (
-                id TEXT PRIMARY KEY, name TEXT, street TEXT, "zipCode" TEXT, city TEXT, email TEXT, kontakte JSONB, historie JSONB
+                id TEXT PRIMARY KEY,
+                anrede TEXT,
+                name TEXT,
+                street TEXT,
+                "zipCode" TEXT,
+                city TEXT,
+                email TEXT,
+                kontakte JSONB,
+                historie JSONB
             );
         `);
         await client.query(`
             CREATE TABLE IF NOT EXISTS akten (
-                id TEXT PRIMARY KEY, "caseNumber" TEXT, "mandantId" TEXT, "gegnerId" TEXT, dokumente JSONB, aufgaben JSONB, notizen JSONB, fristen JSONB
+                id TEXT PRIMARY KEY,
+                "caseNumber" TEXT,
+                "mandantId" TEXT,
+                "gegnerId" TEXT,
+                betreff TEXT,
+                status TEXT,
+                kategorie TEXT,
+                "responsiblePerson" TEXT,
+                "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                dokumente JSONB,
+                aufgaben JSONB,
+                notizen JSONB,
+                fristen JSONB
             );
         `);
         console.log('Database tables are ready.');
