@@ -144,11 +144,11 @@ createCrudEndpoints(aktenRouter, 'akten', ['dokumente', 'aufgaben', 'notizen', '
 app.use('/api/records', aktenRouter);
 
 const mandantenRouter = express.Router();
-createCrudEndpoints(mandantenRouter, 'mandanten');
+createCrudEndpoints(mandantenRouter, 'mandanten', ['kontakte', 'historie']);
 app.use('/api/mandanten', mandantenRouter);
 
 const dritteRouter = express.Router();
-createCrudEndpoints(dritteRouter, 'gegner');
+createCrudEndpoints(dritteRouter, 'gegner', ['kontakte', 'historie']);
 app.use('/api/dritte-beteiligte', dritteRouter);
 
 const initializeDatabase = async () => {
@@ -158,12 +158,12 @@ const initializeDatabase = async () => {
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS mandanten (
-                id TEXT PRIMARY KEY, name TEXT, street TEXT, "zipCode" TEXT, city TEXT, email TEXT
+                id TEXT PRIMARY KEY, name TEXT, street TEXT, "zipCode" TEXT, city TEXT, email TEXT, kontakte JSONB, historie JSONB
             );
         `);
         await client.query(`
             CREATE TABLE IF NOT EXISTS gegner (
-                id TEXT PRIMARY KEY, name TEXT, street TEXT, "zipCode" TEXT, city TEXT, email TEXT
+                id TEXT PRIMARY KEY, name TEXT, street TEXT, "zipCode" TEXT, city TEXT, email TEXT, kontakte JSONB, historie JSONB
             );
         `);
         await client.query(`
