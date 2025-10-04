@@ -154,7 +154,7 @@ const initializeDatabase = async () => {
         `);
         await client.query(`
             CREATE TABLE IF NOT EXISTS akten (
-                id TEXT PRIMARY KEY, "caseNumber" TEXT, "mandantId" TEXT, "gegnerId" TEXT, dokumente JSONB
+                id TEXT PRIMARY KEY, "caseNumber" TEXT, "mandantId" TEXT, "gegnerId" TEXT, dokumente JSONB, aufgaben JSONB, notizen JSONB, fristen JSONB
             );
         `);
         console.log('Database tables are ready.');

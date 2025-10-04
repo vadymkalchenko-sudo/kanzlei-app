@@ -10,6 +10,7 @@ services:
       - "3001:3001"
     volumes:
       - ./data:/app/kanzlei-data
+      - /kanzlei_data/documents:/app/documents
     environment:
       - DATA_PATH=/app/kanzlei-data
     command: npm start
