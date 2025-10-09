@@ -16,3 +16,11 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+# Temporäre/Lokale JSON-Daten und Musterdaten
+# Diese Dateien entstehen nur im lokalen/Entwicklungsbetrieb und duerfen nicht in Git
+backend/kanzlei-data/
+kanzlei-data/
+
+# Typische Entwicklungsdateien
+*.log
+*.sqlite
