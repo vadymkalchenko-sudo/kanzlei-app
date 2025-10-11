@@ -343,8 +343,12 @@ const initializeDatabase = async () => {
     }
 };
 
+const { testSchreibzugriff } = require('./repositories/mandantenRepo');
+
 initializeDatabase().then(() => {
     app.listen(port, () => {
         console.log(`API-Server läuft auf http://localhost:${port}`);
+        // Führe den Test-Schreibzugriff nach dem Serverstart aus
+        testSchreibzugriff(pool);
     });
 });
