@@ -384,6 +384,7 @@ const initializeDatabase = async () => {
         }
 
         // Ensure backward compatibility by adding missing columns to existing tables
+        await client.query('ALTER TABLE mandanten ADD COLUMN IF NOT EXISTS hausnummer TEXT;');
         await client.query('ALTER TABLE gegner ADD COLUMN IF NOT EXISTS kontakte JSONB;');
         await client.query('ALTER TABLE gegner ADD COLUMN IF NOT EXISTS historie JSONB;');
         console.log('Schema migration for existing tables completed.');
