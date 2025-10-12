@@ -7,10 +7,11 @@ const testSchreibzugriff = async (pool) => {
       id: crypto.randomUUID(),
       anrede: 'Herr',
       name: 'Test Testperson',
-      street: 'Testweg 1',
-      zipCode: '12345',
-      city: 'Teststadt',
-      email: 'test@test.de',
+      strasse: 'Testweg',
+      hausnummer: '1',
+      plz: '12345',
+      ort: 'Teststadt',
+      mailadresse: 'test@test.de',
       kontakte: JSON.stringify([]),
       historie: JSON.stringify([])
     };
