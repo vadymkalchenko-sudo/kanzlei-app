@@ -35,20 +35,20 @@ const unbundleFromJsonb = (item) => {
 };
 
 const findAll = async () => {
-    const result = await pool.query('SELECT * FROM mandanten');
+    const result = await pool.query('SELECT * FROM gegner');
     return result.rows.map(unbundleFromJsonb);
 };
 
 const findById = async (id) => {
-    const result = await pool.query('SELECT * FROM mandanten WHERE id = $1', [id]);
+    const result = await pool.query('SELECT * FROM gegner WHERE id = $1', [id]);
     if (result.rows.length === 0) {
         return null;
     }
     return unbundleFromJsonb(result.rows[0]);
 };
 
-const create = async (mandant) => {
-    const newItem = bundleToJsonb(mandant);
+const create = async (gegner) => {
+    const newItem = bundleToJsonb(gegner);
     if (!newItem.id) {
         newItem.id = crypto.randomUUID();
     }
@@ -60,13 +60,13 @@ const create = async (mandant) => {
     const values = Object.values(newItem);
     const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
 
-    const query = `INSERT INTO mandanten (${columns}) VALUES (${placeholders}) RETURNING *`;
+    const query = `INSERT INTO gegner (${columns}) VALUES (${placeholders}) RETURNING *`;
     const result = await pool.query(query, values);
     return unbundleFromJsonb(result.rows[0]);
 };
 
-const update = async (id, mandant) => {
-    const itemToUpdate = bundleToJsonb(mandant);
+const update = async (id, gegner) => {
+    const itemToUpdate = bundleToJsonb(gegner);
     delete itemToUpdate.id;
 
     if (itemToUpdate.historie && typeof itemToUpdate.historie === 'object') {
@@ -76,7 +76,7 @@ const update = async (id, mandant) => {
     const columns = Object.keys(itemToUpdate).map((key, i) => `"${key}" = $${i + 2}`).join(', ');
     const values = [id, ...Object.values(itemToUpdate)];
 
-    const query = `UPDATE mandanten SET ${columns} WHERE id = $1 RETURNING *`;
+    const query = `UPDATE gegner SET ${columns} WHERE id = $1 RETURNING *`;
     const result = await pool.query(query, values);
     if (result.rows.length === 0) {
         return null;
@@ -85,7 +85,7 @@ const update = async (id, mandant) => {
 };
 
 const remove = async (id) => {
-    const result = await pool.query('DELETE FROM mandanten WHERE id = $1', [id]);
+    const result = await pool.query('DELETE FROM gegner WHERE id = $1', [id]);
     return result.rowCount;
 };
 
