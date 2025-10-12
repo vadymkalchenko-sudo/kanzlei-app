@@ -192,11 +192,213 @@ const mandantenRouter = express.Router();
 // createCrudEndpoints(mandantenRouter, 'mandanten', ['kontakte', 'historie']); // Replaced with specific handlers
 app.use('/api/mandanten', mandantenRouter);
 
-createCrudEndpoints(mandantenRouter, 'mandanten', ['kontakte', 'historie']);
+const contactFields = ['strasse', 'hausnummer', 'plz', 'ort', 'mailadresse', 'telefonnummer', 'iban'];
+
+// Helper to bundle data into JSONB
+const bundleToJsonb = (body) => {
+    const newItem = { ...body };
+    const kontakte = {};
+    contactFields.forEach(field => {
+        if (newItem[field]) {
+            kontakte[field] = newItem[field];
+            delete newItem[field];
+        }
+    });
+    newItem.kontakte = JSON.stringify(kontakte);
+    return newItem;
+};
+
+// Helper to unbundle data from JSONB
+const unbundleFromJsonb = (item) => {
+    const result = { ...item };
+    if (result.kontakte) {
+        Object.assign(result, result.kontakte);
+        // delete result.kontakte; // Keep it for frontend if needed
+    }
+    return result;
+};
+
+// GET all Mandanten
+mandantenRouter.get('/', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM mandanten');
+        res.json(result.rows.map(unbundleFromJsonb));
+    } catch (err) {
+        console.error('Fehler beim Lesen der Mandanten:', err);
+        res.status(500).json({ error: 'Fehler beim Lesen der Mandanten' });
+    }
+});
+
+// GET Mandant by ID
+mandantenRouter.get('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('SELECT * FROM mandanten WHERE id = $1', [id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Mandant nicht gefunden' });
+        }
+        res.json(unbundleFromJsonb(result.rows[0]));
+    } catch (err) {
+        console.error('Fehler beim Lesen von Mandant:', err);
+        res.status(500).json({ error: 'Fehler beim Lesen von Mandant' });
+    }
+});
+
+// POST new Mandant
+mandantenRouter.post('/', async (req, res) => {
+    try {
+        const newItem = bundleToJsonb(req.body);
+        if (!newItem.id) newItem.id = crypto.randomUUID();
+        if (newItem.historie && typeof newItem.historie === 'object') {
+            newItem.historie = JSON.stringify(newItem.historie);
+        }
+
+        const columns = Object.keys(newItem).map(key => `"${key}"`).join(', ');
+        const values = Object.values(newItem);
+        const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
+
+        const query = `INSERT INTO mandanten (${columns}) VALUES (${placeholders}) RETURNING *`;
+        const result = await pool.query(query, values);
+        res.status(201).json(unbundleFromJsonb(result.rows[0]));
+    } catch (err) {
+        console.error('Fehler beim Erstellen von Mandant:', err);
+        res.status(500).json({ error: 'Fehler beim Erstellen von Mandant', details: err.message });
+    }
+});
+
+// PUT update Mandant
+mandantenRouter.put('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const itemFromRequest = bundleToJsonb(req.body);
+        delete itemFromRequest.id;
+
+        if (itemFromRequest.historie && typeof itemFromRequest.historie === 'object') {
+            itemFromRequest.historie = JSON.stringify(itemFromRequest.historie);
+        }
+
+        const columns = Object.keys(itemFromRequest).map((key, i) => `"${key}" = $${i + 2}`).join(', ');
+        const values = [id, ...Object.values(itemFromRequest)];
+
+        const query = `UPDATE mandanten SET ${columns} WHERE id = $1 RETURNING *`;
+        const result = await pool.query(query, values);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Mandant nicht gefunden' });
+        }
+        res.json(unbundleFromJsonb(result.rows[0]));
+    } catch (err) {
+        console.error('Fehler beim Aktualisieren von Mandant:', err);
+        res.status(500).json({ error: 'Fehler beim Aktualisieren von Mandant' });
+    }
+});
+
+// DELETE Mandant
+mandantenRouter.delete('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('DELETE FROM mandanten WHERE id = $1', [id]);
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Mandant nicht gefunden' });
+        }
+        res.status(204).send();
+    } catch (err) {
+        console.error('Fehler beim Löschen von Mandant:', err);
+        res.status(500).json({ error: 'Fehler beim Löschen von Mandant' });
+    }
+});
+
 
 const dritteRouter = express.Router();
-createCrudEndpoints(dritteRouter, 'gegner', ['kontakte', 'historie']);
 app.use('/api/dritte-beteiligte', dritteRouter);
+
+// GET all Gegner
+dritteRouter.get('/', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM gegner');
+        res.json(result.rows.map(unbundleFromJsonb));
+    } catch (err) {
+        console.error('Fehler beim Lesen der Gegner:', err);
+        res.status(500).json({ error: 'Fehler beim Lesen der Gegner' });
+    }
+});
+
+// GET Gegner by ID
+dritteRouter.get('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('SELECT * FROM gegner WHERE id = $1', [id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Gegner nicht gefunden' });
+        }
+        res.json(unbundleFromJsonb(result.rows[0]));
+    } catch (err) {
+        console.error('Fehler beim Lesen von Gegner:', err);
+        res.status(500).json({ error: 'Fehler beim Lesen von Gegner' });
+    }
+});
+
+// POST new Gegner
+dritteRouter.post('/', async (req, res) => {
+    try {
+        const newItem = bundleToJsonb(req.body);
+        if (!newItem.id) newItem.id = crypto.randomUUID();
+        if (newItem.historie && typeof newItem.historie === 'object') {
+            newItem.historie = JSON.stringify(newItem.historie);
+        }
+
+        const columns = Object.keys(newItem).map(key => `"${key}"`).join(', ');
+        const values = Object.values(newItem);
+        const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
+
+        const query = `INSERT INTO gegner (${columns}) VALUES (${placeholders}) RETURNING *`;
+        const result = await pool.query(query, values);
+        res.status(201).json(unbundleFromJsonb(result.rows[0]));
+    } catch (err) {
+        console.error('Fehler beim Erstellen von Gegner:', err);
+        res.status(500).json({ error: 'Fehler beim Erstellen von Gegner', details: err.message });
+    }
+});
+
+// PUT update Gegner
+dritteRouter.put('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const itemFromRequest = bundleToJsonb(req.body);
+        delete itemFromRequest.id;
+
+        if (itemFromRequest.historie && typeof itemFromRequest.historie === 'object') {
+            itemFromRequest.historie = JSON.stringify(itemFromRequest.historie);
+        }
+
+        const columns = Object.keys(itemFromRequest).map((key, i) => `"${key}" = $${i + 2}`).join(', ');
+        const values = [id, ...Object.values(itemFromRequest)];
+
+        const query = `UPDATE gegner SET ${columns} WHERE id = $1 RETURNING *`;
+        const result = await pool.query(query, values);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Gegner nicht gefunden' });
+        }
+        res.json(unbundleFromJsonb(result.rows[0]));
+    } catch (err) {
+        console.error('Fehler beim Aktualisieren von Gegner:', err);
+        res.status(500).json({ error: 'Fehler beim Aktualisieren von Gegner' });
+    }
+});
+
+// DELETE Gegner
+dritteRouter.delete('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('DELETE FROM gegner WHERE id = $1', [id]);
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Gegner nicht gefunden' });
+        }
+        res.status(204).send();
+    } catch (err) {
+        console.error('Fehler beim Löschen von Gegner:', err);
+        res.status(500).json({ error: 'Fehler beim Löschen von Gegner' });
+    }
+});
 
 // Überschreibe die Standard-Endpunkte für Akten mit spezifischer Logik
 aktenRouter.post('/', async (req, res) => {
@@ -308,34 +510,27 @@ const initializeDatabase = async () => {
     try {
         client = await pool.connect();
 
+        // Harmonized Schemas
         await client.query(`
             CREATE TABLE IF NOT EXISTS mandanten (
                 id TEXT PRIMARY KEY,
                 anrede TEXT,
                 name TEXT,
-                strasse TEXT,
-                hausnummer TEXT,
-                plz TEXT,
-                ort TEXT,
-                mailadresse TEXT,
-                telefonnummer TEXT,
                 kontakte JSONB,
                 historie JSONB
             );
         `);
+
         await client.query(`
             CREATE TABLE IF NOT EXISTS gegner (
                 id TEXT PRIMARY KEY,
                 anrede TEXT,
                 name TEXT,
-                street TEXT,
-                "zipCode" TEXT,
-                city TEXT,
-                email TEXT,
                 kontakte JSONB,
                 historie JSONB
             );
         `);
+
         await client.query(`
             CREATE TABLE IF NOT EXISTS akten (
                 id TEXT PRIMARY KEY,
@@ -363,8 +558,38 @@ const initializeDatabase = async () => {
                 role TEXT NOT NULL
             );
         `);
-
         console.log('Database tables are ready.');
+
+        // Schema Migration Logic
+        const mandantenCols = await client.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'mandanten'");
+        const mandantenColNames = mandantenCols.rows.map(r => r.column_name);
+        if (mandantenColNames.includes('strasse')) await client.query('ALTER TABLE mandanten RENAME COLUMN strasse TO street;');
+        if (mandantenColNames.includes('hausnummer')) await client.query('ALTER TABLE mandanten RENAME COLUMN hausnummer TO street_number;');
+        if (mandantenColNames.includes('plz')) await client.query('ALTER TABLE mandanten RENAME COLUMN plz TO zip_code;');
+        if (mandantenColNames.includes('ort')) await client.query('ALTER TABLE mandanten RENAME COLUMN ort TO city;');
+        if (mandantenColNames.includes('mailadresse')) await client.query('ALTER TABLE mandanten RENAME COLUMN mailadresse TO email;');
+        if (mandantenColNames.includes('telefonnummer')) await client.query('ALTER TABLE mandanten RENAME COLUMN telefonnummer TO phone;');
+
+        await client.query('ALTER TABLE mandanten ADD COLUMN IF NOT EXISTS kontakte JSONB;');
+        await client.query('ALTER TABLE gegner ADD COLUMN IF NOT EXISTS kontakte JSONB;');
+
+        const columnsToDropMandanten = ['street', 'street_number', 'zip_code', 'city', 'email', 'phone'];
+        for (const col of columnsToDropMandanten) {
+            if (mandantenColNames.includes(col)) {
+                 await client.query(`ALTER TABLE mandanten DROP COLUMN ${col};`);
+            }
+        }
+
+        const gegnerCols = await client.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'gegner'");
+        const gegnerColNames = gegnerCols.rows.map(r => r.column_name);
+        const columnsToDropGegner = ['street', 'zipCode', 'city', 'email'];
+         for (const col of columnsToDropGegner) {
+            if (gegnerColNames.includes(col)) {
+                 await client.query(`ALTER TABLE gegner DROP COLUMN ${col};`);
+            }
+        }
+
+        console.log('Schema migration for existing tables completed.');
 
         // Create initial admin user
         const adminPassword = process.env.ADMIN_INITIAL_PASSWORD;
@@ -382,12 +607,6 @@ const initializeDatabase = async () => {
         } else {
             console.log('ADMIN_INITIAL_PASSWORD not set, skipping admin creation.');
         }
-
-        // Ensure backward compatibility by adding missing columns to existing tables
-        await client.query('ALTER TABLE mandanten ADD COLUMN IF NOT EXISTS hausnummer TEXT;');
-        await client.query('ALTER TABLE gegner ADD COLUMN IF NOT EXISTS kontakte JSONB;');
-        await client.query('ALTER TABLE gegner ADD COLUMN IF NOT EXISTS historie JSONB;');
-        console.log('Schema migration for existing tables completed.');
 
     } catch (err) {
         console.error('Could not initialize database:', err.message);
