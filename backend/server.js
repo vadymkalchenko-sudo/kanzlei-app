@@ -192,37 +192,13 @@ const mandantenRouter = express.Router();
 // createCrudEndpoints(mandantenRouter, 'mandanten', ['kontakte', 'historie']); // Replaced with specific handlers
 app.use('/api/mandanten', mandantenRouter);
 
-const contactFields = ['strasse', 'hausnummer', 'plz', 'ort', 'mailadresse', 'telefonnummer', 'iban'];
-
-// Helper to bundle data into JSONB
-const bundleToJsonb = (body) => {
-    const newItem = { ...body };
-    const kontakte = {};
-    contactFields.forEach(field => {
-        if (newItem[field]) {
-            kontakte[field] = newItem[field];
-            delete newItem[field];
-        }
-    });
-    newItem.kontakte = JSON.stringify(kontakte);
-    return newItem;
-};
-
-// Helper to unbundle data from JSONB
-const unbundleFromJsonb = (item) => {
-    const result = { ...item };
-    if (result.kontakte) {
-        Object.assign(result, result.kontakte);
-        // delete result.kontakte; // Keep it for frontend if needed
-    }
-    return result;
-};
+const mandantenRepo = require('./repositories/mandantenRepo');
 
 // GET all Mandanten
 mandantenRouter.get('/', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM mandanten');
-        res.json(result.rows.map(unbundleFromJsonb));
+        const mandanten = await mandantenRepo.findAll();
+        res.json(mandanten);
     } catch (err) {
         console.error('Fehler beim Lesen der Mandanten:', err);
         res.status(500).json({ error: 'Fehler beim Lesen der Mandanten' });
@@ -233,11 +209,11 @@ mandantenRouter.get('/', async (req, res) => {
 mandantenRouter.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query('SELECT * FROM mandanten WHERE id = $1', [id]);
-        if (result.rows.length === 0) {
+        const mandant = await mandantenRepo.findById(id);
+        if (!mandant) {
             return res.status(404).json({ error: 'Mandant nicht gefunden' });
         }
-        res.json(unbundleFromJsonb(result.rows[0]));
+        res.json(mandant);
     } catch (err) {
         console.error('Fehler beim Lesen von Mandant:', err);
         res.status(500).json({ error: 'Fehler beim Lesen von Mandant' });
@@ -247,19 +223,8 @@ mandantenRouter.get('/:id', async (req, res) => {
 // POST new Mandant
 mandantenRouter.post('/', async (req, res) => {
     try {
-        const newItem = bundleToJsonb(req.body);
-        if (!newItem.id) newItem.id = crypto.randomUUID();
-        if (newItem.historie && typeof newItem.historie === 'object') {
-            newItem.historie = JSON.stringify(newItem.historie);
-        }
-
-        const columns = Object.keys(newItem).map(key => `"${key}"`).join(', ');
-        const values = Object.values(newItem);
-        const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
-
-        const query = `INSERT INTO mandanten (${columns}) VALUES (${placeholders}) RETURNING *`;
-        const result = await pool.query(query, values);
-        res.status(201).json(unbundleFromJsonb(result.rows[0]));
+        const newMandant = await mandantenRepo.create(req.body);
+        res.status(201).json(newMandant);
     } catch (err) {
         console.error('Fehler beim Erstellen von Mandant:', err);
         res.status(500).json({ error: 'Fehler beim Erstellen von Mandant', details: err.message });
@@ -270,22 +235,11 @@ mandantenRouter.post('/', async (req, res) => {
 mandantenRouter.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const itemFromRequest = bundleToJsonb(req.body);
-        delete itemFromRequest.id;
-
-        if (itemFromRequest.historie && typeof itemFromRequest.historie === 'object') {
-            itemFromRequest.historie = JSON.stringify(itemFromRequest.historie);
-        }
-
-        const columns = Object.keys(itemFromRequest).map((key, i) => `"${key}" = $${i + 2}`).join(', ');
-        const values = [id, ...Object.values(itemFromRequest)];
-
-        const query = `UPDATE mandanten SET ${columns} WHERE id = $1 RETURNING *`;
-        const result = await pool.query(query, values);
-        if (result.rows.length === 0) {
+        const updatedMandant = await mandantenRepo.update(id, req.body);
+        if (!updatedMandant) {
             return res.status(404).json({ error: 'Mandant nicht gefunden' });
         }
-        res.json(unbundleFromJsonb(result.rows[0]));
+        res.json(updatedMandant);
     } catch (err) {
         console.error('Fehler beim Aktualisieren von Mandant:', err);
         res.status(500).json({ error: 'Fehler beim Aktualisieren von Mandant' });
@@ -296,8 +250,8 @@ mandantenRouter.put('/:id', async (req, res) => {
 mandantenRouter.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query('DELETE FROM mandanten WHERE id = $1', [id]);
-        if (result.rowCount === 0) {
+        const rowCount = await mandantenRepo.remove(id);
+        if (rowCount === 0) {
             return res.status(404).json({ error: 'Mandant nicht gefunden' });
         }
         res.status(204).send();
@@ -311,11 +265,13 @@ mandantenRouter.delete('/:id', async (req, res) => {
 const dritteRouter = express.Router();
 app.use('/api/dritte-beteiligte', dritteRouter);
 
+const gegnerRepo = require('./repositories/gegnerRepo');
+
 // GET all Gegner
 dritteRouter.get('/', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM gegner');
-        res.json(result.rows.map(unbundleFromJsonb));
+        const gegner = await gegnerRepo.findAll();
+        res.json(gegner);
     } catch (err) {
         console.error('Fehler beim Lesen der Gegner:', err);
         res.status(500).json({ error: 'Fehler beim Lesen der Gegner' });
@@ -326,11 +282,11 @@ dritteRouter.get('/', async (req, res) => {
 dritteRouter.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query('SELECT * FROM gegner WHERE id = $1', [id]);
-        if (result.rows.length === 0) {
+        const gegner = await gegnerRepo.findById(id);
+        if (!gegner) {
             return res.status(404).json({ error: 'Gegner nicht gefunden' });
         }
-        res.json(unbundleFromJsonb(result.rows[0]));
+        res.json(gegner);
     } catch (err) {
         console.error('Fehler beim Lesen von Gegner:', err);
         res.status(500).json({ error: 'Fehler beim Lesen von Gegner' });
@@ -340,19 +296,8 @@ dritteRouter.get('/:id', async (req, res) => {
 // POST new Gegner
 dritteRouter.post('/', async (req, res) => {
     try {
-        const newItem = bundleToJsonb(req.body);
-        if (!newItem.id) newItem.id = crypto.randomUUID();
-        if (newItem.historie && typeof newItem.historie === 'object') {
-            newItem.historie = JSON.stringify(newItem.historie);
-        }
-
-        const columns = Object.keys(newItem).map(key => `"${key}"`).join(', ');
-        const values = Object.values(newItem);
-        const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
-
-        const query = `INSERT INTO gegner (${columns}) VALUES (${placeholders}) RETURNING *`;
-        const result = await pool.query(query, values);
-        res.status(201).json(unbundleFromJsonb(result.rows[0]));
+        const newGegner = await gegnerRepo.create(req.body);
+        res.status(201).json(newGegner);
     } catch (err) {
         console.error('Fehler beim Erstellen von Gegner:', err);
         res.status(500).json({ error: 'Fehler beim Erstellen von Gegner', details: err.message });
@@ -363,22 +308,11 @@ dritteRouter.post('/', async (req, res) => {
 dritteRouter.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const itemFromRequest = bundleToJsonb(req.body);
-        delete itemFromRequest.id;
-
-        if (itemFromRequest.historie && typeof itemFromRequest.historie === 'object') {
-            itemFromRequest.historie = JSON.stringify(itemFromRequest.historie);
-        }
-
-        const columns = Object.keys(itemFromRequest).map((key, i) => `"${key}" = $${i + 2}`).join(', ');
-        const values = [id, ...Object.values(itemFromRequest)];
-
-        const query = `UPDATE gegner SET ${columns} WHERE id = $1 RETURNING *`;
-        const result = await pool.query(query, values);
-        if (result.rows.length === 0) {
+        const updatedGegner = await gegnerRepo.update(id, req.body);
+        if (!updatedGegner) {
             return res.status(404).json({ error: 'Gegner nicht gefunden' });
         }
-        res.json(unbundleFromJsonb(result.rows[0]));
+        res.json(updatedGegner);
     } catch (err) {
         console.error('Fehler beim Aktualisieren von Gegner:', err);
         res.status(500).json({ error: 'Fehler beim Aktualisieren von Gegner' });
@@ -389,8 +323,8 @@ dritteRouter.put('/:id', async (req, res) => {
 dritteRouter.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query('DELETE FROM gegner WHERE id = $1', [id]);
-        if (result.rowCount === 0) {
+        const rowCount = await gegnerRepo.remove(id);
+        if (rowCount === 0) {
             return res.status(404).json({ error: 'Gegner nicht gefunden' });
         }
         res.status(204).send();
