@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
@@ -10,11 +11,11 @@ const port = 3001;
 
 // PostgreSQL connection details
 const pool = new Pool({
-    user: 'kanzlei_user',
-    host: '192.168.178.82',
-    database: 'kanzlei_db',
-    password: 'IHR_SICHERES_PASSWORT',
-    port: 5432,
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_DATABASE,
+    password: process.env.DB_PASSWORD,
+    port: process.env.DB_PORT,
     connectionTimeoutMillis: 5000, // Add a timeout to avoid long hangs
 });
 
