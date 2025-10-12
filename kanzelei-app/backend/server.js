@@ -313,28 +313,12 @@ const initializeDatabase = async () => {
         `);
         console.log('Database tables are ready.');
 
-        const res = await client.query('SELECT COUNT(*) FROM mandanten');
-        if (res.rows[0].count > 0) {
-            console.log('Database already contains data.');
-            return;
-        }
-
-        console.log('Database is empty, seeding initial data...');
-        const initialDataPath = path.join(__dirname, 'initial-data');
-        const readFile = (fileName) => fs.readFile(path.join(initialDataPath, fileName), 'utf-8').then(JSON.parse);
-
-        const mandant1 = await readFile('mandant1.json');
-        await client.query('INSERT INTO mandanten (id, name, street, "zipCode", city, email) VALUES ($1, $2, $3, $4, $5, $6)', [mandant1.id, mandant1.name, mandant1.street, mandant1.zipCode, mandant1.city, mandant1.email]);
-
-        const gegner1 = await readFile('gegner1.json');
-        await client.query('INSERT INTO gegner (id, name, street, "zipCode", city, email) VALUES ($1, $2, $3, $4, $5, $6)', [gegner1.id, gegner1.name, gegner1.street, gegner1.zipCode, gegner1.city, gegner1.email]);
-
-        const akten = await Promise.all([readFile('akte1.json'), readFile('akte2.json'), readFile('akte3.json')]);
-        for (const akte of akten) {
-            await client.query('INSERT INTO akten (id, "caseNumber", "mandantId", "gegnerId", dokumente) VALUES ($1, $2, $3, $4, $5)', [akte.id, akte.caseNumber, akte.mandantId, akte.gegnerId, JSON.stringify(akte.dokumente)]);
-        }
-
-        console.log('Initial data successfully seeded.');
+        // Ensure backward compatibility by adding missing columns to existing tables
+        await client.query('ALTER TABLE mandanten ADD COLUMN IF NOT EXISTS kontakte JSONB;');
+        await client.query('ALTER TABLE mandanten ADD COLUMN IF NOT EXISTS historie JSONB;');
+        await client.query('ALTER TABLE gegner ADD COLUMN IF NOT EXISTS kontakte JSONB;');
+        await client.query('ALTER TABLE gegner ADD COLUMN IF NOT EXISTS historie JSONB;');
+        console.log('Schema migration for existing tables completed.');
 
     } catch (err) {
         console.error('Could not initialize database:', err.message);
