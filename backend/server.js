@@ -396,16 +396,8 @@ const initializeDatabase = async () => {
     }
 };
 
-const { testSchreibzugriff } = require('./repositories/mandantenRepo');
-
 initializeDatabase().then(() => {
     app.listen(port, () => {
         console.log(`API-Server läuft auf http://localhost:${port}`);
-        // Führe den Test-Schreibzugriff nach dem Serverstart aus, wenn nicht übersprungen
-        if (process.env.SKIP_DB_TESTS !== 'true') {
-            testSchreibzugriff(pool);
-        } else {
-            console.log('INFO: Datenbank-Test wird übersprungen (SKIP_DB_TESTS=true).');
-        }
     });
 });
