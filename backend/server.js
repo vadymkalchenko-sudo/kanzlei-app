@@ -5,6 +5,8 @@ const { Pool } = require('pg');
 const path = require('path');
 const fs = require('fs').promises;
 const crypto = require('crypto');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const port = 3001;
@@ -22,15 +24,52 @@ const pool = new Pool({
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-// Temporary login bypass
-app.post('/api/login', (req, res) => {
-    res.json({
-        success: true,
-        user: {
-            name: 'Test User',
-            roles: ['admin']
+// Login endpoint
+app.post('/api/login', async (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password are required' });
+    }
+
+    try {
+        const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+        if (result.rows.length === 0) {
+            return res.status(401).json({ error: 'Invalid credentials' });
         }
-    });
+
+        const user = result.rows[0];
+        const passwordMatch = await bcrypt.compare(password, user.password_hash);
+
+        if (!passwordMatch) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        const jwtSecret = process.env.JWT_SECRET;
+        if (!jwtSecret) {
+            console.error('JWT_SECRET is not defined. Please set it in your .env file');
+            return res.status(500).json({ error: 'Internal server error: JWT secret not configured.' });
+        }
+
+        const token = jwt.sign(
+            { id: user.id, username: user.username, role: user.role },
+            jwtSecret,
+            { expiresIn: '1h' }
+        );
+
+        res.json({
+            success: true,
+            token,
+            user: {
+                id: user.id,
+                username: user.username,
+                role: user.role
+            }
+        });
+    } catch (err) {
+        console.error('Login error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 const createCrudEndpoints = (router, tableName, jsonbColumns = []) => {
@@ -150,8 +189,151 @@ createCrudEndpoints(aktenRouter, 'akten', ['dokumente', 'aufgaben', 'notizen', '
 app.use('/api/records', aktenRouter);
 
 const mandantenRouter = express.Router();
-createCrudEndpoints(mandantenRouter, 'mandanten', ['kontakte', 'historie']);
+// createCrudEndpoints(mandantenRouter, 'mandanten', ['kontakte', 'historie']); // Replaced with specific handlers
 app.use('/api/mandanten', mandantenRouter);
+
+// Helper to map frontend fields to DB columns for Mandanten
+const mapMandantToDb = (data) => {
+    const mapping = {
+        street: 'strasse',
+        zipCode: 'plz',
+        city: 'ort',
+        email: 'mailadresse',
+        phone: 'telefonnummer'
+    };
+    const mappedData = { ...data };
+    for (const [key, value] of Object.entries(mapping)) {
+        if (mappedData[key]) {
+            mappedData[value] = mappedData[key];
+            delete mappedData[key];
+        }
+    }
+    return mappedData;
+};
+
+// Helper to map DB columns to frontend fields for Mandanten
+const mapDbToMandant = (data) => {
+    const mapping = {
+        strasse: 'street',
+        plz: 'zipCode',
+        ort: 'city',
+        mailadresse: 'email',
+        telefonnummer: 'phone'
+    };
+    const mappedData = { ...data };
+    for (const [key, value] of Object.entries(mapping)) {
+        if (mappedData[key]) {
+            mappedData[value] = mappedData[key];
+            delete mappedData[key];
+        }
+    }
+    return mappedData;
+};
+
+// GET all Mandanten
+mandantenRouter.get('/', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM mandanten');
+        const mappedRows = result.rows.map(mapDbToMandant);
+        res.json(mappedRows);
+    } catch (err) {
+        console.error('Fehler beim Lesen der Mandanten:', err);
+        res.status(500).json({ error: 'Fehler beim Lesen der Mandanten' });
+    }
+});
+
+// GET Mandant by ID
+mandantenRouter.get('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('SELECT * FROM mandanten WHERE id = $1', [id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Mandant nicht gefunden' });
+        }
+        res.json(mapDbToMandant(result.rows[0]));
+    } catch (err) {
+        console.error('Fehler beim Lesen von Mandant:', err);
+        res.status(500).json({ error: 'Fehler beim Lesen von Mandant' });
+    }
+});
+
+// POST new Mandant
+mandantenRouter.post('/', async (req, res) => {
+    try {
+        const newItem = mapMandantToDb(req.body);
+        if (!newItem.id) {
+            newItem.id = crypto.randomUUID();
+        }
+
+        const jsonbColumns = ['kontakte', 'historie'];
+        jsonbColumns.forEach(key => {
+            if (newItem[key] && typeof newItem[key] === 'object') {
+                newItem[key] = JSON.stringify(newItem[key]);
+            }
+        });
+
+        const columns = Object.keys(newItem).map(key => `"${key}"`).join(', ');
+        const values = Object.values(newItem);
+        const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
+
+        const query = `INSERT INTO mandanten (${columns}) VALUES (${placeholders}) RETURNING *`;
+        const result = await pool.query(query, values);
+
+        console.log(`Mandant erfolgreich erstellt:`, result.rows[0]);
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error(`Fehler beim Erstellen von Mandant:`, err);
+        res.status(500).json({ error: `Fehler beim Erstellen von Mandant`, details: err.message });
+    }
+});
+
+// Override PUT for /api/mandanten/:id
+mandantenRouter.put('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const itemFromRequest = mapMandantToDb(req.body);
+        delete itemFromRequest.id;
+
+        const jsonbColumns = ['kontakte', 'historie'];
+        jsonbColumns.forEach(key => {
+            if (itemFromRequest[key] && typeof itemFromRequest[key] === 'object') {
+                itemFromRequest[key] = JSON.stringify(itemFromRequest[key]);
+            }
+        });
+
+        const columns = Object.keys(itemFromRequest).map((key, i) => `"${key}" = $${i + 2}`).join(', ');
+        const values = [id, ...Object.values(itemFromRequest)];
+
+        const query = `UPDATE mandanten SET ${columns} WHERE id = $1 RETURNING *`;
+        const result = await pool.query(query, values);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: `Mandant nicht gefunden` });
+        }
+
+        console.log(`Mandant erfolgreich aktualisiert:`, result.rows[0]);
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(`Fehler beim Aktualisieren von Mandant:`, err);
+        res.status(500).json({ error: `Fehler beim Aktualisieren von Mandant` });
+    }
+});
+
+// DELETE Mandant
+mandantenRouter.delete('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('DELETE FROM mandanten WHERE id = $1', [id]);
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Mandant nicht gefunden' });
+        }
+        console.log(`Mandant erfolgreich gelöscht: id ${id}`);
+        res.status(204).send();
+    } catch (err) {
+        console.error('Fehler beim Löschen von Mandant:', err);
+        res.status(500).json({ error: 'Fehler beim Löschen von Mandant' });
+    }
+});
 
 const dritteRouter = express.Router();
 createCrudEndpoints(dritteRouter, 'gegner', ['kontakte', 'historie']);
@@ -312,7 +494,34 @@ const initializeDatabase = async () => {
                 fristen JSONB
             );
         `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL
+            );
+        `);
+
         console.log('Database tables are ready.');
+
+        // Create initial admin user
+        const adminPassword = process.env.ADMIN_INITIAL_PASSWORD;
+        if (adminPassword) {
+            const result = await client.query('SELECT id FROM users WHERE username = $1', ['admin']);
+            if (result.rows.length === 0) {
+                const hashedPassword = await bcrypt.hash(adminPassword, 10);
+                const userId = crypto.randomUUID();
+                await client.query(
+                    'INSERT INTO users (id, username, password_hash, role) VALUES ($1, $2, $3, $4)',
+                    [userId, 'admin', hashedPassword, 'admin']
+                );
+                console.log('Initial admin user created.');
+            }
+        } else {
+            console.log('ADMIN_INITIAL_PASSWORD not set, skipping admin creation.');
+        }
 
         // Ensure backward compatibility by adding missing columns to existing tables
         await client.query('ALTER TABLE gegner ADD COLUMN IF NOT EXISTS kontakte JSONB;');
