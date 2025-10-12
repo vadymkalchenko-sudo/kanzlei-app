@@ -192,148 +192,7 @@ const mandantenRouter = express.Router();
 // createCrudEndpoints(mandantenRouter, 'mandanten', ['kontakte', 'historie']); // Replaced with specific handlers
 app.use('/api/mandanten', mandantenRouter);
 
-// Helper to map frontend fields to DB columns for Mandanten
-const mapMandantToDb = (data) => {
-    const mapping = {
-        street: 'strasse',
-        zipCode: 'plz',
-        city: 'ort',
-        email: 'mailadresse',
-        phone: 'telefonnummer'
-    };
-    const mappedData = { ...data };
-    for (const [key, value] of Object.entries(mapping)) {
-        if (mappedData[key]) {
-            mappedData[value] = mappedData[key];
-            delete mappedData[key];
-        }
-    }
-    return mappedData;
-};
-
-// Helper to map DB columns to frontend fields for Mandanten
-const mapDbToMandant = (data) => {
-    const mapping = {
-        strasse: 'street',
-        plz: 'zipCode',
-        ort: 'city',
-        mailadresse: 'email',
-        telefonnummer: 'phone'
-    };
-    const mappedData = { ...data };
-    for (const [key, value] of Object.entries(mapping)) {
-        if (mappedData[key]) {
-            mappedData[value] = mappedData[key];
-            delete mappedData[key];
-        }
-    }
-    return mappedData;
-};
-
-// GET all Mandanten
-mandantenRouter.get('/', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM mandanten');
-        const mappedRows = result.rows.map(mapDbToMandant);
-        res.json(mappedRows);
-    } catch (err) {
-        console.error('Fehler beim Lesen der Mandanten:', err);
-        res.status(500).json({ error: 'Fehler beim Lesen der Mandanten' });
-    }
-});
-
-// GET Mandant by ID
-mandantenRouter.get('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const result = await pool.query('SELECT * FROM mandanten WHERE id = $1', [id]);
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Mandant nicht gefunden' });
-        }
-        res.json(mapDbToMandant(result.rows[0]));
-    } catch (err) {
-        console.error('Fehler beim Lesen von Mandant:', err);
-        res.status(500).json({ error: 'Fehler beim Lesen von Mandant' });
-    }
-});
-
-// POST new Mandant
-mandantenRouter.post('/', async (req, res) => {
-    try {
-        const newItem = mapMandantToDb(req.body);
-        if (!newItem.id) {
-            newItem.id = crypto.randomUUID();
-        }
-
-        const jsonbColumns = ['kontakte', 'historie'];
-        jsonbColumns.forEach(key => {
-            if (newItem[key] && typeof newItem[key] === 'object') {
-                newItem[key] = JSON.stringify(newItem[key]);
-            }
-        });
-
-        const columns = Object.keys(newItem).map(key => `"${key}"`).join(', ');
-        const values = Object.values(newItem);
-        const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
-
-        const query = `INSERT INTO mandanten (${columns}) VALUES (${placeholders}) RETURNING *`;
-        const result = await pool.query(query, values);
-
-        console.log(`Mandant erfolgreich erstellt:`, result.rows[0]);
-        res.status(201).json(result.rows[0]);
-    } catch (err) {
-        console.error(`Fehler beim Erstellen von Mandant:`, err);
-        res.status(500).json({ error: `Fehler beim Erstellen von Mandant`, details: err.message });
-    }
-});
-
-// Override PUT for /api/mandanten/:id
-mandantenRouter.put('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const itemFromRequest = mapMandantToDb(req.body);
-        delete itemFromRequest.id;
-
-        const jsonbColumns = ['kontakte', 'historie'];
-        jsonbColumns.forEach(key => {
-            if (itemFromRequest[key] && typeof itemFromRequest[key] === 'object') {
-                itemFromRequest[key] = JSON.stringify(itemFromRequest[key]);
-            }
-        });
-
-        const columns = Object.keys(itemFromRequest).map((key, i) => `"${key}" = $${i + 2}`).join(', ');
-        const values = [id, ...Object.values(itemFromRequest)];
-
-        const query = `UPDATE mandanten SET ${columns} WHERE id = $1 RETURNING *`;
-        const result = await pool.query(query, values);
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: `Mandant nicht gefunden` });
-        }
-
-        console.log(`Mandant erfolgreich aktualisiert:`, result.rows[0]);
-        res.json(result.rows[0]);
-    } catch (err) {
-        console.error(`Fehler beim Aktualisieren von Mandant:`, err);
-        res.status(500).json({ error: `Fehler beim Aktualisieren von Mandant` });
-    }
-});
-
-// DELETE Mandant
-mandantenRouter.delete('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const result = await pool.query('DELETE FROM mandanten WHERE id = $1', [id]);
-        if (result.rowCount === 0) {
-            return res.status(404).json({ error: 'Mandant nicht gefunden' });
-        }
-        console.log(`Mandant erfolgreich gelöscht: id ${id}`);
-        res.status(204).send();
-    } catch (err) {
-        console.error('Fehler beim Löschen von Mandant:', err);
-        res.status(500).json({ error: 'Fehler beim Löschen von Mandant' });
-    }
-});
+createCrudEndpoints(mandantenRouter, 'mandanten', ['kontakte', 'historie']);
 
 const dritteRouter = express.Router();
 createCrudEndpoints(dritteRouter, 'gegner', ['kontakte', 'historie']);
@@ -455,6 +314,7 @@ const initializeDatabase = async () => {
                 anrede TEXT,
                 name TEXT,
                 strasse TEXT,
+                hausnummer TEXT,
                 plz TEXT,
                 ort TEXT,
                 mailadresse TEXT,
@@ -541,7 +401,11 @@ const { testSchreibzugriff } = require('./repositories/mandantenRepo');
 initializeDatabase().then(() => {
     app.listen(port, () => {
         console.log(`API-Server läuft auf http://localhost:${port}`);
-        // Führe den Test-Schreibzugriff nach dem Serverstart aus
-        testSchreibzugriff(pool);
+        // Führe den Test-Schreibzugriff nach dem Serverstart aus, wenn nicht übersprungen
+        if (process.env.SKIP_DB_TESTS !== 'true') {
+            testSchreibzugriff(pool);
+        } else {
+            console.log('INFO: Datenbank-Test wird übersprungen (SKIP_DB_TESTS=true).');
+        }
     });
 });
