@@ -272,10 +272,11 @@ const initializeDatabase = async () => {
                 id TEXT PRIMARY KEY,
                 anrede TEXT,
                 name TEXT,
-                street TEXT,
-                "zipCode" TEXT,
-                city TEXT,
-                email TEXT,
+                strasse TEXT,
+                plz TEXT,
+                ort TEXT,
+                mailadresse TEXT,
+                telefonnummer TEXT,
                 kontakte JSONB,
                 historie JSONB
             );
@@ -314,13 +315,6 @@ const initializeDatabase = async () => {
         console.log('Database tables are ready.');
 
         // Ensure backward compatibility by adding missing columns to existing tables
-        await client.query('ALTER TABLE mandanten ADD COLUMN IF NOT EXISTS kontakte JSONB;');
-        await client.query('ALTER TABLE mandanten ADD COLUMN IF NOT EXISTS historie JSONB;');
-        await client.query('ALTER TABLE mandanten ADD COLUMN IF NOT EXISTS strasse TEXT;');
-        await client.query('ALTER TABLE mandanten ADD COLUMN IF NOT EXISTS plz TEXT;');
-        await client.query('ALTER TABLE mandanten ADD COLUMN IF NOT EXISTS ort TEXT;');
-        await client.query('ALTER TABLE mandanten ADD COLUMN IF NOT EXISTS mailadresse TEXT;');
-        await client.query('ALTER TABLE mandanten ADD COLUMN IF NOT EXISTS telefonnummer TEXT;');
         await client.query('ALTER TABLE gegner ADD COLUMN IF NOT EXISTS kontakte JSONB;');
         await client.query('ALTER TABLE gegner ADD COLUMN IF NOT EXISTS historie JSONB;');
         console.log('Schema migration for existing tables completed.');
