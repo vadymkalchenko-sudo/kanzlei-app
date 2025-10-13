@@ -9,7 +9,7 @@ const pool = new Pool({
     port: process.env.DB_PORT,
 });
 
-const metadataFields = ['caseNumber', 'betreff', 'status', 'kategorie', 'responsiblePerson', 'createdAt', 'updatedAt'];
+const metadataFields = ['caseNumber', 'betreff', 'status', 'kategorie', 'responsiblePerson', 'createdAt', 'updatedAt', 'schadenDatum'];
 
 const bundleToJsonb = (body) => {
     const newItem = { ...body };
