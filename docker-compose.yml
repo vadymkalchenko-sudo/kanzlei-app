@@ -12,6 +12,11 @@ services:
     # Dies stellt sicher, dass 192.168.178.82 verwendet wird, anstatt des Standardwerts 127.0.0.1.
     env_file:
       - .env
+    volumes:
+      - ./data:/app/kanzlei-data
+      - /kanzlei_data/documents:/app/documents
+    environment:
+      - DATA_PATH=/app/kanzlei-data
     command: npm start
 
   frontend:
