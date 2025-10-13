@@ -295,41 +295,36 @@ const initializeDatabase = async () => {
     try {
         client = await pool.connect();
 
-        // TEMPORARY: Purge akten table on startup
-        await client.query('DELETE FROM akten;');
-        console.log('TEMPORARY: Akten table purged.');
+        // Drop existing tables to ensure a clean slate
+        await client.query('DROP TABLE IF EXISTS users, mandanten, akten, gegner CASCADE;');
+        console.log('Existing tables dropped.');
 
-        // Harmonized Schemas
+        // Corrected Hybrid Schemas
         await client.query(`
             CREATE TABLE IF NOT EXISTS mandanten (
                 id TEXT PRIMARY KEY,
-                anrede TEXT,
                 name TEXT,
-                kontakte JSONB,
-                historie JSONB
-            );
-        `);
-
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS gegner (
-                id TEXT PRIMARY KEY,
-                anrede TEXT,
-                name TEXT,
-                kontakte JSONB,
-                historie JSONB
+                status TEXT,
+                metadaten JSONB
             );
         `);
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS akten (
                 id TEXT PRIMARY KEY,
-                "mandantId" TEXT,
-                "gegnerId" TEXT,
-                metadaten JSONB,
-                dokumente JSONB,
-                aufgaben JSONB,
-                notizen JSONB,
-                fristen JSONB
+                aktenzeichen TEXT,
+                status TEXT,
+                mandanten_id TEXT,
+                metadaten JSONB
+            );
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS gegner (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                akten_id TEXT,
+                metadaten JSONB
             );
         `);
 
@@ -341,38 +336,7 @@ const initializeDatabase = async () => {
                 role TEXT NOT NULL
             );
         `);
-        console.log('Database tables are ready.');
-
-        // Schema Migration Logic
-        const mandantenCols = await client.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'mandanten'");
-        const mandantenColNames = mandantenCols.rows.map(r => r.column_name);
-        if (mandantenColNames.includes('strasse')) await client.query('ALTER TABLE mandanten RENAME COLUMN strasse TO street;');
-        if (mandantenColNames.includes('hausnummer')) await client.query('ALTER TABLE mandanten RENAME COLUMN hausnummer TO street_number;');
-        if (mandantenColNames.includes('plz')) await client.query('ALTER TABLE mandanten RENAME COLUMN plz TO zip_code;');
-        if (mandantenColNames.includes('ort')) await client.query('ALTER TABLE mandanten RENAME COLUMN ort TO city;');
-        if (mandantenColNames.includes('mailadresse')) await client.query('ALTER TABLE mandanten RENAME COLUMN mailadresse TO email;');
-        if (mandantenColNames.includes('telefonnummer')) await client.query('ALTER TABLE mandanten RENAME COLUMN telefonnummer TO phone;');
-
-        await client.query('ALTER TABLE mandanten ADD COLUMN IF NOT EXISTS kontakte JSONB;');
-        await client.query('ALTER TABLE gegner ADD COLUMN IF NOT EXISTS kontakte JSONB;');
-
-        const columnsToDropMandanten = ['street', 'street_number', 'zip_code', 'city', 'email', 'phone'];
-        for (const col of columnsToDropMandanten) {
-            if (mandantenColNames.includes(col)) {
-                 await client.query(`ALTER TABLE mandanten DROP COLUMN ${col};`);
-            }
-        }
-
-        const gegnerCols = await client.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'gegner'");
-        const gegnerColNames = gegnerCols.rows.map(r => r.column_name);
-        const columnsToDropGegner = ['street', 'zipCode', 'city', 'email'];
-         for (const col of columnsToDropGegner) {
-            if (gegnerColNames.includes(col)) {
-                 await client.query(`ALTER TABLE gegner DROP COLUMN ${col};`);
-            }
-        }
-
-        console.log('Schema migration for existing tables completed.');
+        console.log('Database tables created with correct hybrid schema.');
 
         // Create initial admin user
         const adminPassword = process.env.ADMIN_INITIAL_PASSWORD;
@@ -393,7 +357,7 @@ const initializeDatabase = async () => {
 
     } catch (err) {
         console.error('Could not initialize database:', err.message);
-        console.log('This is expected if the external database is not running. The application will start, but API calls will fail.');
+        console.error('This might be expected if the external database is not ready. The application will start, but API calls will fail.');
     } finally {
         if (client) client.release();
     }
