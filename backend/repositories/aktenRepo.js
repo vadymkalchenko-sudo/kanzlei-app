@@ -9,23 +9,6 @@ const pool = new Pool({
     port: process.env.DB_PORT,
 });
 
-const metadataFields = ['caseNumber', 'betreff', 'status', 'kategorie', 'responsiblePerson', 'createdAt', 'updatedAt', 'schadenDatum'];
-
-const bundleToJsonb = (body) => {
-    const newItem = { ...body };
-    const metadaten = {};
-    metadataFields.forEach(field => {
-        if (newItem[field]) {
-            metadaten[field] = newItem[field];
-            delete newItem[field];
-        }
-    });
-    if (Object.keys(metadaten).length > 0) {
-        newItem.metadaten = JSON.stringify(metadaten);
-    }
-    return newItem;
-};
-
 const unbundleFromJsonb = (item) => {
     const result = { ...item };
     if (result.metadaten) {
@@ -49,28 +32,56 @@ const findById = async (id) => {
 };
 
 const create = async (akte) => {
-    const newItem = bundleToJsonb(akte);
-    if (!newItem.id) {
-        newItem.id = crypto.randomUUID();
-    }
+    const { mandantId, gegnerId, dokumente, aufgaben, notizen, fristen, ...metadaten } = akte;
+    const newAkte = {
+        id: crypto.randomUUID(),
+        mandantId,
+        gegnerId,
+        metadaten: JSON.stringify(metadaten),
+        dokumente: JSON.stringify(dokumente || []),
+        aufgaben: JSON.stringify(aufgaben || []),
+        notizen: JSON.stringify(notizen || []),
+        fristen: JSON.stringify(fristen || []),
+    };
 
-    const columns = Object.keys(newItem).map(key => `"${key}"`).join(', ');
-    const values = Object.values(newItem);
-    const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
+    const query = `
+        INSERT INTO akten (id, "mandantId", "gegnerId", metadaten, dokumente, aufgaben, notizen, fristen)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING *
+    `;
+    const values = [newAkte.id, newAkte.mandantId, newAkte.gegnerId, newAkte.metadaten, newAkte.dokumente, newAkte.aufgaben, newAkte.notizen, newAkte.fristen];
 
-    const query = `INSERT INTO akten (${columns}) VALUES (${placeholders}) RETURNING *`;
     const result = await pool.query(query, values);
     return unbundleFromJsonb(result.rows[0]);
 };
 
 const update = async (id, akte) => {
-    const itemToUpdate = bundleToJsonb(akte);
-    delete itemToUpdate.id;
+    const { mandantId, gegnerId, dokumente, aufgaben, notizen, fristen, ...metadaten } = akte;
 
-    const columns = Object.keys(itemToUpdate).map((key, i) => `"${key}" = $${i + 2}`).join(', ');
-    const values = [id, ...Object.values(itemToUpdate)];
+    const query = `
+        UPDATE akten
+        SET
+            "mandantId" = $2,
+            "gegnerId" = $3,
+            metadaten = $4,
+            dokumente = $5,
+            aufgaben = $6,
+            notizen = $7,
+            fristen = $8
+        WHERE id = $1
+        RETURNING *
+    `;
+    const values = [
+        id,
+        mandantId,
+        gegnerId,
+        JSON.stringify(metadaten),
+        JSON.stringify(dokumente || []),
+        JSON.stringify(aufgaben || []),
+        JSON.stringify(notizen || []),
+        JSON.stringify(fristen || []),
+    ];
 
-    const query = `UPDATE akten SET ${columns} WHERE id = $1 RETURNING *`;
     const result = await pool.query(query, values);
     if (result.rows.length === 0) {
         return null;
