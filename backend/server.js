@@ -183,7 +183,75 @@ const createCrudEndpoints = (router, tableName, jsonbColumns = []) => {
 
 // Erstelle Router für jeden Entitätstyp
 const aktenRouter = express.Router();
-createCrudEndpoints(aktenRouter, 'akten', ['dokumente', 'aufgaben', 'notizen', 'fristen']);
+const aktenRepo = require('./repositories/aktenRepo');
+
+// GET all Akten
+aktenRouter.get('/', async (req, res) => {
+    try {
+        const akten = await aktenRepo.findAll();
+        res.json(akten);
+    } catch (err) {
+        console.error('Fehler beim Lesen der Akten:', err);
+        res.status(500).json({ error: 'Fehler beim Lesen der Akten' });
+    }
+});
+
+// GET Akte by ID
+aktenRouter.get('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const akte = await aktenRepo.findById(id);
+        if (!akte) {
+            return res.status(404).json({ error: 'Akte nicht gefunden' });
+        }
+        res.json(akte);
+    } catch (err) {
+        console.error('Fehler beim Lesen von Akte:', err);
+        res.status(500).json({ error: 'Fehler beim Lesen von Akte' });
+    }
+});
+
+// POST new Akte
+aktenRouter.post('/', async (req, res) => {
+    try {
+        const newAkte = await aktenRepo.create(req.body);
+        res.status(201).json(newAkte);
+    } catch (err) {
+        console.error('Fehler beim Erstellen von Akte:', err);
+        res.status(500).json({ error: 'Fehler beim Erstellen von Akte', details: err.message });
+    }
+});
+
+// PUT update Akte
+aktenRouter.put('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updatedAkte = await aktenRepo.update(id, req.body);
+        if (!updatedAkte) {
+            return res.status(404).json({ error: 'Akte nicht gefunden' });
+        }
+        res.json(updatedAkte);
+    } catch (err) {
+        console.error('Fehler beim Aktualisieren von Akte:', err);
+        res.status(500).json({ error: 'Fehler beim Aktualisieren von Akte' });
+    }
+});
+
+// DELETE Akte
+aktenRouter.delete('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const rowCount = await aktenRepo.remove(id);
+        if (rowCount === 0) {
+            return res.status(404).json({ error: 'Akte nicht gefunden' });
+        }
+        res.status(204).send();
+    } catch (err) {
+        console.error('Fehler beim Löschen von Akte:', err);
+        res.status(500).json({ error: 'Fehler beim Löschen von Akte' });
+    }
+});
+
 app.use('/api/records', aktenRouter);
 
 const mandantenRouter = express.Router();
@@ -362,15 +430,9 @@ const initializeDatabase = async () => {
         await client.query(`
             CREATE TABLE IF NOT EXISTS akten (
                 id TEXT PRIMARY KEY,
-                "caseNumber" TEXT,
                 "mandantId" TEXT,
                 "gegnerId" TEXT,
-                betreff TEXT,
-                status TEXT,
-                kategorie TEXT,
-                "responsiblePerson" TEXT,
-                "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                metadaten JSONB,
                 dokumente JSONB,
                 aufgaben JSONB,
                 notizen JSONB,
