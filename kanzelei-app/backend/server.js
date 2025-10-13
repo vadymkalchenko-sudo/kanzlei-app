@@ -1,22 +1,12 @@
 const express = require('express');
 const cors = require('cors');
-const { Pool } = require('pg');
 const path = require('path');
 const fs = require('fs').promises;
 const crypto = require('crypto');
+const pool = require('./config/db'); // Import the centralized pool
 
 const app = express();
 const port = 3001;
-
-// PostgreSQL connection details
-const pool = new Pool({
-    user: 'kanzlei_user',
-    host: '192.168.178.82',
-    database: 'kanzlei_db',
-    password: 'IHR_SICHERES_PASSWORT',
-    port: 5432,
-    connectionTimeoutMillis: 5000, // Add a timeout to avoid long hangs
-});
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -54,6 +44,7 @@ const createCrudEndpoints = (router, tableName, jsonbColumns = []) => {
 
             const query = `INSERT INTO ${tableName} (${columns}) VALUES (${placeholders}) RETURNING *`;
             const result = await pool.query(query, values);
+
 
             console.log(`${tableName} erfolgreich erstellt:`, result.rows[0]);
             res.status(201).json(result.rows[0]);
@@ -113,7 +104,9 @@ const createCrudEndpoints = (router, tableName, jsonbColumns = []) => {
                 return res.status(404).json({ error: `${tableName} nicht gefunden` });
             }
 
-            console.log(`${tableName} erfolgreich aktualisiert:`, result.rows[0]);
+            const updatedItem = result.rows[0];
+
+            console.log(`${tableName} erfolgreich aktualisiert:`, updatedItem);
             res.json(result.rows[0]);
         } catch (err) {
             console.error(`Fehler beim Aktualisieren von ${tableName}:`, err);
@@ -125,6 +118,8 @@ const createCrudEndpoints = (router, tableName, jsonbColumns = []) => {
     router.delete('/:id', async (req, res) => {
         try {
             const { id } = req.params;
+
+
             const result = await pool.query(`DELETE FROM ${tableName} WHERE id = $1`, [id]);
             if (result.rowCount === 0) {
                 return res.status(404).json({ error: `${tableName} nicht gefunden` });
@@ -138,15 +133,11 @@ const createCrudEndpoints = (router, tableName, jsonbColumns = []) => {
     });
 };
 
-// Erstelle Router für jeden Entitätstyp
-const aktenRouter = express.Router();
-createCrudEndpoints(aktenRouter, 'akten', ['dokumente', 'aufgaben', 'notizen', 'fristen']);
-app.use('/api/records', aktenRouter);
+// API Routes
+app.use('/api/records', require('./routes/aktenRoutes'));
+app.use('/api/mandanten', require('./routes/mandantenRoutes'));
 
-const mandantenRouter = express.Router();
-createCrudEndpoints(mandantenRouter, 'mandanten', ['kontakte', 'historie']);
-app.use('/api/mandanten', mandantenRouter);
-
+// Temporäre Beibehaltung der alten Route für Dritte/Gegner
 const dritteRouter = express.Router();
 createCrudEndpoints(dritteRouter, 'gegner', ['kontakte', 'historie']);
 app.use('/api/dritte-beteiligte', dritteRouter);
