@@ -3,7 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const path = require('path');
-const fs = require('fs').promises;
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -353,20 +352,10 @@ aktenRouter.post('/', async (req, res) => {
         const result = await pool.query(query, values);
         const newCase = result.rows[0];
 
-        // Physischen Ordner erstellen
-        const caseDirectory = path.join(__dirname, 'documents', newCase.id);
-        await fs.mkdir(caseDirectory, { recursive: true });
-        console.log(`Verzeichnis für Akte erstellt: ${caseDirectory}`);
-
         res.status(201).json(newCase);
     } catch (err) {
         console.error(`Fehler beim Erstellen der Akte:`, err);
-        // Spezifische Fehlerbehandlung für die Verzeichniserstellung
-        if (err.code === 'EEXIST') {
-            res.status(500).json({ error: 'Fehler beim Erstellen des Aktenverzeichnisses: Verzeichnis existiert bereits.' });
-        } else {
-            res.status(500).json({ error: 'Fehler beim Erstellen der Akte', details: err.message });
-        }
+        res.status(500).json({ error: 'Fehler beim Erstellen der Akte', details: err.message });
     }
 });
 
@@ -393,15 +382,6 @@ aktenRouter.put('/:id', async (req, res) => {
         }
         const updatedItem = result.rows[0];
 
-        // Archivierungslogik
-        if (itemFromRequest.status === 'geschlossen' && updatedItem.mandantId) {
-            const mandantRes = await pool.query('SELECT * FROM mandanten WHERE id = $1', [updatedItem.mandantId]);
-            if (mandantRes.rows.length > 0) {
-                const archivePath = path.join(__dirname, 'documents', updatedItem.id, 'mandant_archiv.json');
-                await fs.writeFile(archivePath, JSON.stringify(mandantRes.rows[0], null, 2));
-                console.log(`Mandant-Snapshot für Akte ${updatedItem.id} archiviert.`);
-            }
-        }
 
         res.json(updatedItem);
     } catch (err) {
@@ -414,23 +394,10 @@ aktenRouter.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Zuerst den Datenbankeintrag löschen, um bei einem Fehler hier nicht den Ordner zu löschen
-        const result = await pool.query(`DELETE FROM akten WHERE id = $1 RETURNING *`, [id]);
+        const result = await pool.query(`DELETE FROM akten WHERE id = $1`, [id]);
         if (result.rowCount === 0) {
             return res.status(404).json({ error: 'Akte nicht gefunden' });
         }
-
-        // Physischen Ordner löschen
-        const caseDirectory = path.join(__dirname, 'documents', id);
-        try {
-            await fs.rm(caseDirectory, { recursive: true, force: true });
-            console.log(`Verzeichnis für Akte gelöscht: ${caseDirectory}`);
-        } catch (dirError) {
-            // Wenn das Löschen des Ordners fehlschlägt, ist das ein sekundärer Fehler.
-            // Der Haupt-Request war erfolgreich. Wir loggen den Fehler für die spätere Überprüfung.
-            console.error(`Konnte das Verzeichnis für die gelöschte Akte ${id} nicht entfernen:`, dirError);
-        }
-
         console.log(`Akte erfolgreich gelöscht: id ${id}`);
         res.status(204).send();
     } catch (err) {
