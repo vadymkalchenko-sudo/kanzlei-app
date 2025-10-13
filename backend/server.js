@@ -70,117 +70,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-const createCrudEndpoints = (router, tableName, jsonbColumns = []) => {
-    // POST create
-    router.post('/', async (req, res) => {
-        try {
-            const newItem = req.body;
-            if (!newItem.id) {
-                newItem.id = crypto.randomUUID();
-            }
-
-            // Stringify JSONB columns before insert
-            jsonbColumns.forEach(key => {
-                if (newItem[key] && typeof newItem[key] === 'object') {
-                    newItem[key] = JSON.stringify(newItem[key]);
-                }
-            });
-
-            const columns = Object.keys(newItem).map(key => `"${key}"`).join(', ');
-            const values = Object.values(newItem);
-            const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
-
-            const query = `INSERT INTO ${tableName} (${columns}) VALUES (${placeholders}) RETURNING *`;
-            const result = await pool.query(query, values);
-
-
-            console.log(`${tableName} erfolgreich erstellt:`, result.rows[0]);
-            res.status(201).json(result.rows[0]);
-        } catch (err) {
-            console.error(`Fehler beim Erstellen von ${tableName}:`, err);
-            res.status(500).json({ error: `Fehler beim Erstellen von ${tableName}`, details: err.message });
-        }
-    });
-
-    // GET all
-    router.get('/', async (req, res) => {
-        try {
-            const result = await pool.query(`SELECT * FROM ${tableName}`);
-            res.json(result.rows);
-        } catch (err) {
-            console.error(`Fehler beim Lesen der ${tableName}:`, err);
-            res.status(500).json({ error: `Fehler beim Lesen der ${tableName}` });
-        }
-    });
-
-    // GET by id
-    router.get('/:id', async (req, res) => {
-        try {
-            const { id } = req.params;
-            const result = await pool.query(`SELECT * FROM ${tableName} WHERE id = $1`, [id]);
-            if (result.rows.length === 0) {
-                return res.status(404).json({ error: `${tableName} nicht gefunden` });
-            }
-            res.json(result.rows[0]);
-        } catch (err) {
-            console.error(`Fehler beim Lesen von ${tableName}:`, err);
-            res.status(500).json({ error: `Fehler beim Lesen von ${tableName}` });
-        }
-    });
-
-    // PUT update
-    router.put('/:id', async (req, res) => {
-        try {
-            const { id } = req.params;
-            const itemFromRequest = req.body;
-            delete itemFromRequest.id;
-
-            // Stringify JSONB columns before update
-            jsonbColumns.forEach(key => {
-                if (itemFromRequest[key] && typeof itemFromRequest[key] === 'object') {
-                    itemFromRequest[key] = JSON.stringify(itemFromRequest[key]);
-                }
-            });
-
-            const columns = Object.keys(itemFromRequest).map((key, i) => `"${key}" = $${i + 2}`).join(', ');
-            const values = [id, ...Object.values(itemFromRequest)];
-
-            const query = `UPDATE ${tableName} SET ${columns} WHERE id = $1 RETURNING *`;
-            const result = await pool.query(query, values);
-
-            if (result.rows.length === 0) {
-                return res.status(404).json({ error: `${tableName} nicht gefunden` });
-            }
-
-            const updatedItem = result.rows[0];
-
-            console.log(`${tableName} erfolgreich aktualisiert:`, updatedItem);
-            res.json(result.rows[0]);
-        } catch (err) {
-            console.error(`Fehler beim Aktualisieren von ${tableName}:`, err);
-            res.status(500).json({ error: `Fehler beim Aktualisieren von ${tableName}` });
-        }
-    });
-
-    // DELETE
-    router.delete('/:id', async (req, res) => {
-        try {
-            const { id } = req.params;
-
-
-            const result = await pool.query(`DELETE FROM ${tableName} WHERE id = $1`, [id]);
-            if (result.rowCount === 0) {
-                return res.status(404).json({ error: `${tableName} nicht gefunden` });
-            }
-            console.log(`${tableName} erfolgreich gelöscht: id ${id}`);
-            res.status(204).send();
-        } catch (err) {
-            console.error(`Fehler beim Löschen von ${tableName}:`, err);
-            res.status(500).json({ error: `Fehler beim Löschen von ${tableName}` });
-        }
-    });
-};
-
 // Erstelle Router für jeden Entitätstyp
 const aktenRouter = express.Router();
 const aktenRepo = require('./repositories/aktenRepo');
@@ -405,6 +294,10 @@ const initializeDatabase = async () => {
     let client;
     try {
         client = await pool.connect();
+
+        // TEMPORARY: Purge akten table on startup
+        await client.query('DELETE FROM akten;');
+        console.log('TEMPORARY: Akten table purged.');
 
         // Harmonized Schemas
         await client.query(`
