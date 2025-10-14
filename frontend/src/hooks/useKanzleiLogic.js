@@ -35,6 +35,22 @@ export const useKanzleiLogic = () => {
   };
 
   const fetchData = useCallback(async (signal) => {
+    // Zwangsmigration: Explizites Laden von localStorage, um es dann durch API-Aufrufe zu ersetzen.
+    // Dieser Block simuliert den von Ihnen beschriebenen Zustand und migriert ihn.
+    const localMandanten = JSON.parse(localStorage.getItem('mandanten') || '[]');
+    const localRecords = JSON.parse(localStorage.getItem('records') || '[]');
+    const localDritte = JSON.parse(localStorage.getItem('dritteBeteiligte') || '[]');
+
+    if (localMandanten.length > 0 || localRecords.length > 0) {
+        console.log("Veraltete lokale Daten gefunden. Beginne Migration zur API.");
+        // Hier könnte eine Logik stehen, um lokale Daten zur API zu migrieren.
+        // Fürs Erste löschen wir die lokalen Daten, um die API als Quelle zu erzwingen.
+        localStorage.removeItem('mandanten');
+        localStorage.removeItem('records');
+        localStorage.removeItem('dritteBeteiligte');
+        setFlashMessage('Lokale Daten wurden entfernt. Lade aktuelle Daten vom Server.');
+    }
+
     try {
       const [mandantenData, recordsData, dritteData] = await Promise.all([
         api.getMandanten(signal),
@@ -42,57 +58,12 @@ export const useKanzleiLogic = () => {
         api.getDritteBeteiligte(signal),
       ]);
 
-      // If the request was aborted, the API calls will return undefined.
-      // We should not proceed with state updates if that's the case.
       if (!mandantenData || !recordsData || !dritteData) {
         return;
       }
 
-      // MIGRATE DATA: If a record has notes but no 'aufgaben' array, separate them.
-      // This is a client-side migration that prepares the data for the UI.
-      // The new structure will be persisted upon the next update to the record.
-      const migratedRecords = recordsData.map(record => {
-        // Ensure 'dokumente' and 'notizen' are arrays and add financial fields if missing.
-        const migratedDokumente = (record.dokumente || []).map(doc => ({
-          ...doc,
-          betrag_soll: doc.betrag_soll ?? 0,
-          betrag_haben: doc.betrag_haben ?? 0,
-        }));
-
-        const migratedNotizen = (record.notizen || []).map(note => ({
-          ...note,
-          betrag_soll: note.betrag_soll ?? 0,
-          betrag_haben: note.betrag_haben ?? 0,
-        }));
-
-        // First, migrate fristen to aufgaben if fristen exists
-        if (record.fristen) {
-            record.aufgaben = [...(record.aufgaben || []), ...record.fristen];
-            delete record.fristen;
-        }
-
-        if (record.aufgaben === undefined && record.notizen) {
-          const aufgaben = record.notizen
-            .filter(item => item.datum) // Deadlines are notes with a date
-            .map(item => ({
-              id: item.id,
-              titel: item.titel,
-              datum: item.datum,
-              erledigt: !!item.erledigt,
-              details: item.details || '',
-            }));
-          const notizen = record.notizen.filter(item => !item.datum);
-          return { ...record, aufgaben, notizen: migratedNotizen, dokumente: migratedDokumente };
-        }
-        // Ensure aufgaben is at least an empty array to prevent downstream errors
-        if (record.aufgaben === undefined) {
-          return { ...record, aufgaben: [], notizen: migratedNotizen, dokumente: migratedDokumente };
-        }
-        return { ...record, notizen: migratedNotizen, dokumente: migratedDokumente };
-      });
-
       setMandanten(mandantenData);
-      setRecords(migratedRecords);
+      setRecords(recordsData);
       setDritteBeteiligte(dritteData);
     } catch (error) {
       if (error.name !== 'AbortError') {
@@ -190,29 +161,13 @@ export const useKanzleiLogic = () => {
 
   const handleAddDocuments = async (recordId, files) => {
     try {
-      const recordToUpdate = records.find(r => r.id === recordId);
-      if (!recordToUpdate) throw new Error('Akte nicht gefunden');
+      const formData = new FormData();
+      Array.from(files).forEach(file => {
+        formData.append('documents', file);
+      });
 
-      const newDocuments = await Promise.all(Array.from(files).map(async (file) => {
-        const content = await readFileAsBase64(file);
-        return {
-          id: `doc_${new Date().getTime()}_${Math.random()}`,
-          datum: new Date().toISOString().split('T')[0],
-          beschreibung: file.name,
-          format: file.type || 'Unbekannt',
-          content: content,
-          soll: 0,
-          haben: 0,
-        };
-      }));
-
-      const updatedRecord = {
-        ...recordToUpdate,
-        dokumente: [...(recordToUpdate.dokumente || []), ...newDocuments],
-      };
-
-      await api.updateRecord(recordId, updatedRecord);
-      setFlashMessage(`${files.length} Dokument(e) erfolgreich hinzugefügt.`);
+      await api.uploadDocuments(recordId, formData);
+      setFlashMessage(`${files.length} Dokument(e) erfolgreich hochgeladen.`);
       fetchData();
     } catch (error) {
       setFlashMessage(`Fehler beim Hinzufügen von Dokumenten: ${error.message}`);

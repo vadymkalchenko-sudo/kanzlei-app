@@ -5,6 +5,26 @@ const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Sicherstellen, dass das Upload-Verzeichnis existiert
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Multer-Konfiguration für Datei-Uploads
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+        cb(null, `${Date.now()}-${file.originalname}`);
+    }
+});
+const upload = multer({ storage: storage });
 
 // Repositories importieren
 const aktenRepo = require('./repositories/aktenRepo');
@@ -162,6 +182,36 @@ const createRouter = (repo) => {
 app.use('/api/records', createRouter(aktenRepo));
 app.use('/api/mandanten', createRouter(mandantenRepo));
 app.use('/api/dritte-beteiligte', createRouter(gegnerRepo));
+
+// Datei-Upload-Route
+app.post('/api/records/:recordId/documents', upload.array('documents'), async (req, res) => {
+    const { recordId } = req.params;
+    try {
+        const record = await aktenRepo.findById(recordId);
+        if (!record) {
+            return res.status(404).json({ error: 'Akte nicht gefunden' });
+        }
+
+        const newDocuments = req.files.map(file => ({
+            id: crypto.randomUUID(),
+            name: file.originalname,
+            path: file.path,
+            mimetype: file.mimetype,
+            size: file.size,
+            createdAt: new Date().toISOString(),
+        }));
+
+        const currentDocuments = record.dokumente || [];
+        const updatedDocuments = [...currentDocuments, ...newDocuments];
+
+        const updatedRecord = await aktenRepo.update(recordId, { ...record, dokumente: updatedDocuments });
+
+        res.status(201).json(updatedRecord);
+    } catch (error) {
+        console.error('Fehler beim Datei-Upload:', error);
+        res.status(500).json({ error: 'Interner Serverfehler beim Upload' });
+    }
+});
 
 // Auth-Routen
 app.post('/api/login', async (req, res) => {
