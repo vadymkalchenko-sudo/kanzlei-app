@@ -28,6 +28,7 @@ async function runMigration() {
     console.log('Tabelle "kanzlei_daten" erfolgreich erstellt oder existiert bereits.');
 
     // 2. Daten einfügen
+    /*
     const insertDataQuery = `
       INSERT INTO kanzlei_daten (mandant_name, fall_status)
       VALUES
@@ -37,6 +38,7 @@ async function runMigration() {
     `;
     await client.query(insertDataQuery);
     console.log('Daten erfolgreich eingefügt.');
+    */
 
     // Transaktion abschließen
     await client.query('COMMIT');
