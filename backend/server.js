@@ -161,7 +161,7 @@ const createRouter = (repo) => {
 // Router anwenden
 app.use('/api/records', createRouter(aktenRepo));
 app.use('/api/mandanten', createRouter(mandantenRepo));
-app.use('/api/gegner', createRouter(gegnerRepo));
+app.use('/api/dritte-beteiligte', createRouter(gegnerRepo));
 
 // Auth-Routen
 app.post('/api/login', async (req, res) => {
