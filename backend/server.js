@@ -2,369 +2,207 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
-const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+
+// Repositories importieren
+const aktenRepo = require('./repositories/aktenRepo');
+const mandantenRepo = require('./repositories/mandantenRepo');
+const gegnerRepo = require('./repositories/gegnerRepo');
 
 const app = express();
-const port = 3001;
+const port = process.env.PORT || 3001;
 
-// PostgreSQL connection details
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Datenbank-Pool
 const pool = new Pool({
     user: process.env.DB_USER,
     host: process.env.DB_HOST,
     database: process.env.DB_DATABASE,
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT,
-    connectionTimeoutMillis: 5000, // Add a timeout to avoid long hangs
 });
 
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-
-// Login endpoint
-app.post('/api/login', async (req, res) => {
-    const { username, password } = req.body;
-
-    if (!username || !password) {
-        return res.status(400).json({ error: 'Username and password are required' });
-    }
-
-    try {
-        const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
-        if (result.rows.length === 0) {
-            return res.status(401).json({ error: 'Invalid credentials' });
-        }
-
-        const user = result.rows[0];
-        const passwordMatch = await bcrypt.compare(password, user.password_hash);
-
-        if (!passwordMatch) {
-            return res.status(401).json({ error: 'Invalid credentials' });
-        }
-
-        const jwtSecret = process.env.JWT_SECRET;
-        if (!jwtSecret) {
-            console.error('JWT_SECRET is not defined. Please set it in your .env file');
-            return res.status(500).json({ error: 'Internal server error: JWT secret not configured.' });
-        }
-
-        const token = jwt.sign(
-            { id: user.id, username: user.username, role: user.role },
-            jwtSecret,
-            { expiresIn: '1h' }
-        );
-
-        res.json({
-            success: true,
-            token,
-            user: {
-                id: user.id,
-                username: user.username,
-                role: user.role
-            }
-        });
-    } catch (err) {
-        console.error('Login error:', err);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-// Erstelle Router für jeden Entitätstyp
-const aktenRouter = express.Router();
-const aktenRepo = require('./repositories/aktenRepo');
-
-// GET all Akten
-aktenRouter.get('/', async (req, res) => {
-    try {
-        const akten = await aktenRepo.findAll();
-        res.json(akten);
-    } catch (err) {
-        console.error('Fehler beim Lesen der Akten:', err);
-        res.status(500).json({ error: 'Fehler beim Lesen der Akten' });
-    }
-});
-
-// GET Akte by ID
-aktenRouter.get('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const akte = await aktenRepo.findById(id);
-        if (!akte) {
-            return res.status(404).json({ error: 'Akte nicht gefunden' });
-        }
-        res.json(akte);
-    } catch (err) {
-        console.error('Fehler beim Lesen von Akte:', err);
-        res.status(500).json({ error: 'Fehler beim Lesen von Akte' });
-    }
-});
-
-// POST new Akte
-aktenRouter.post('/', async (req, res) => {
-    try {
-        const newAkte = await aktenRepo.create(req.body);
-        res.status(201).json(newAkte);
-    } catch (err) {
-        console.error('Fehler beim Erstellen von Akte:', err);
-        res.status(500).json({ error: 'Fehler beim Erstellen von Akte', details: err.message });
-    }
-});
-
-// PUT update Akte
-aktenRouter.put('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const updatedAkte = await aktenRepo.update(id, req.body);
-        if (!updatedAkte) {
-            return res.status(404).json({ error: 'Akte nicht gefunden' });
-        }
-        res.json(updatedAkte);
-    } catch (err) {
-        console.error('Fehler beim Aktualisieren von Akte:', err);
-        res.status(500).json({ error: 'Fehler beim Aktualisieren von Akte' });
-    }
-});
-
-// DELETE Akte
-aktenRouter.delete('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const rowCount = await aktenRepo.remove(id);
-        if (rowCount === 0) {
-            return res.status(404).json({ error: 'Akte nicht gefunden' });
-        }
-        res.status(204).send();
-    } catch (err) {
-        console.error('Fehler beim Löschen von Akte:', err);
-        res.status(500).json({ error: 'Fehler beim Löschen von Akte' });
-    }
-});
-
-app.use('/api/records', aktenRouter);
-
-const mandantenRouter = express.Router();
-// createCrudEndpoints(mandantenRouter, 'mandanten', ['kontakte', 'historie']); // Replaced with specific handlers
-app.use('/api/mandanten', mandantenRouter);
-
-const mandantenRepo = require('./repositories/mandantenRepo');
-
-// GET all Mandanten
-mandantenRouter.get('/', async (req, res) => {
-    try {
-        const mandanten = await mandantenRepo.findAll();
-        res.json(mandanten);
-    } catch (err) {
-        console.error('Fehler beim Lesen der Mandanten:', err);
-        res.status(500).json({ error: 'Fehler beim Lesen der Mandanten' });
-    }
-});
-
-// GET Mandant by ID
-mandantenRouter.get('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const mandant = await mandantenRepo.findById(id);
-        if (!mandant) {
-            return res.status(404).json({ error: 'Mandant nicht gefunden' });
-        }
-        res.json(mandant);
-    } catch (err) {
-        console.error('Fehler beim Lesen von Mandant:', err);
-        res.status(500).json({ error: 'Fehler beim Lesen von Mandant' });
-    }
-});
-
-// POST new Mandant
-mandantenRouter.post('/', async (req, res) => {
-    try {
-        const newMandant = await mandantenRepo.create(req.body);
-        res.status(201).json(newMandant);
-    } catch (err) {
-        console.error('Fehler beim Erstellen von Mandant:', err);
-        res.status(500).json({ error: 'Fehler beim Erstellen von Mandant', details: err.message });
-    }
-});
-
-// PUT update Mandant
-mandantenRouter.put('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const updatedMandant = await mandantenRepo.update(id, req.body);
-        if (!updatedMandant) {
-            return res.status(404).json({ error: 'Mandant nicht gefunden' });
-        }
-        res.json(updatedMandant);
-    } catch (err) {
-        console.error('Fehler beim Aktualisieren von Mandant:', err);
-        res.status(500).json({ error: 'Fehler beim Aktualisieren von Mandant' });
-    }
-});
-
-// DELETE Mandant
-mandantenRouter.delete('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const rowCount = await mandantenRepo.remove(id);
-        if (rowCount === 0) {
-            return res.status(404).json({ error: 'Mandant nicht gefunden' });
-        }
-        res.status(204).send();
-    } catch (err) {
-        console.error('Fehler beim Löschen von Mandant:', err);
-        res.status(500).json({ error: 'Fehler beim Löschen von Mandant' });
-    }
-});
-
-
-const dritteRouter = express.Router();
-app.use('/api/dritte-beteiligte', dritteRouter);
-
-const gegnerRepo = require('./repositories/gegnerRepo');
-
-// GET all Gegner
-dritteRouter.get('/', async (req, res) => {
-    try {
-        const gegner = await gegnerRepo.findAll();
-        res.json(gegner);
-    } catch (err) {
-        console.error('Fehler beim Lesen der Gegner:', err);
-        res.status(500).json({ error: 'Fehler beim Lesen der Gegner' });
-    }
-});
-
-// GET Gegner by ID
-dritteRouter.get('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const gegner = await gegnerRepo.findById(id);
-        if (!gegner) {
-            return res.status(404).json({ error: 'Gegner nicht gefunden' });
-        }
-        res.json(gegner);
-    } catch (err) {
-        console.error('Fehler beim Lesen von Gegner:', err);
-        res.status(500).json({ error: 'Fehler beim Lesen von Gegner' });
-    }
-});
-
-// POST new Gegner
-dritteRouter.post('/', async (req, res) => {
-    try {
-        const newGegner = await gegnerRepo.create(req.body);
-        res.status(201).json(newGegner);
-    } catch (err) {
-        console.error('Fehler beim Erstellen von Gegner:', err);
-        res.status(500).json({ error: 'Fehler beim Erstellen von Gegner', details: err.message });
-    }
-});
-
-// PUT update Gegner
-dritteRouter.put('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const updatedGegner = await gegnerRepo.update(id, req.body);
-        if (!updatedGegner) {
-            return res.status(404).json({ error: 'Gegner nicht gefunden' });
-        }
-        res.json(updatedGegner);
-    } catch (err) {
-        console.error('Fehler beim Aktualisieren von Gegner:', err);
-        res.status(500).json({ error: 'Fehler beim Aktualisieren von Gegner' });
-    }
-});
-
-// DELETE Gegner
-dritteRouter.delete('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const rowCount = await gegnerRepo.remove(id);
-        if (rowCount === 0) {
-            return res.status(404).json({ error: 'Gegner nicht gefunden' });
-        }
-        res.status(204).send();
-    } catch (err) {
-        console.error('Fehler beim Löschen von Gegner:', err);
-        res.status(500).json({ error: 'Fehler beim Löschen von Gegner' });
-    }
-});
-
-
+// Datenbank-Initialisierung
 const initializeDatabase = async () => {
     let client;
     try {
         client = await pool.connect();
+        console.log('Datenbankverbindung erfolgreich.');
 
-        // Drop existing tables to ensure a clean slate
-        await client.query('DROP TABLE IF EXISTS users, mandanten, akten, gegner CASCADE;');
-        console.log('Existing tables dropped.');
+        // FIX: DROP TABLE Befehl MUSS auskommentiert bleiben.
+        // await client.query('DROP TABLE IF EXISTS users, mandanten, akten, gegner CASCADE;');
+        // console.log('Existing tables dropped.');
 
-        // Corrected Hybrid Schemas
+        // CREATE TABLE IF NOT EXISTS Befehle müssen bleiben.
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id UUID PRIMARY KEY,
+                username VARCHAR(255) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                role VARCHAR(50) NOT NULL
+            );
+        `);
+        console.log('Tabelle "users" erstellt oder existiert bereits.');
+
         await client.query(`
             CREATE TABLE IF NOT EXISTS mandanten (
-                id TEXT PRIMARY KEY,
-                name TEXT,
-                status TEXT,
+                id UUID PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                status VARCHAR(255),
                 metadaten JSONB
             );
         `);
+        console.log('Tabelle "mandanten" erstellt oder existiert bereits.');
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS akten (
-                id TEXT PRIMARY KEY,
-                aktenzeichen TEXT,
-                status TEXT,
-                mandanten_id TEXT,
+                id UUID PRIMARY KEY,
+                aktenzeichen VARCHAR(255) UNIQUE NOT NULL,
+                status VARCHAR(255),
+                mandanten_id UUID REFERENCES mandanten(id),
                 metadaten JSONB
             );
         `);
+        console.log('Tabelle "akten" erstellt oder existiert bereits.');
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS gegner (
-                id TEXT PRIMARY KEY,
-                name TEXT,
-                akten_id TEXT,
+                id UUID PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                akten_id UUID REFERENCES akten(id) ON DELETE CASCADE,
                 metadaten JSONB
             );
         `);
+        console.log('Tabelle "gegner" erstellt oder existiert bereits.');
 
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS users (
-                id TEXT PRIMARY KEY,
-                username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                role TEXT NOT NULL
-            );
-        `);
-        console.log('Database tables created with correct hybrid schema.');
-
-        // Create initial admin user
+        // Initialen Admin-Benutzer erstellen, falls nicht vorhanden
         const adminPassword = process.env.ADMIN_INITIAL_PASSWORD;
         if (adminPassword) {
-            const result = await client.query('SELECT id FROM users WHERE username = $1', ['admin']);
-            if (result.rows.length === 0) {
-                const hashedPassword = await bcrypt.hash(adminPassword, 10);
-                const userId = crypto.randomUUID();
+            const adminExists = await client.query("SELECT * FROM users WHERE username = 'admin'");
+            if (adminExists.rows.length === 0) {
+                const passwordHash = await bcrypt.hash(adminPassword, 10);
+                const adminId = crypto.randomUUID();
                 await client.query(
                     'INSERT INTO users (id, username, password_hash, role) VALUES ($1, $2, $3, $4)',
-                    [userId, 'admin', hashedPassword, 'admin']
+                    [adminId, 'admin', passwordHash, 'admin']
                 );
-                console.log('Initial admin user created.');
+                console.log('Initialer Admin-Benutzer erstellt.');
             }
-        } else {
-            console.log('ADMIN_INITIAL_PASSWORD not set, skipping admin creation.');
         }
 
     } catch (err) {
-        console.error('Could not initialize database:', err.message);
-        console.error('This might be expected if the external database is not ready. The application will start, but API calls will fail.');
+        console.error('Fehler bei der Datenbankinitialisierung:', err.stack);
+        process.exit(1); // Prozess beenden, wenn DB-Initialisierung fehlschlägt
     } finally {
         if (client) client.release();
     }
 };
 
-initializeDatabase().then(() => {
-    app.listen(port, () => {
-        console.log(`API-Server läuft auf http://localhost:${port}`);
+// Generische Router-Factory
+const createRouter = (repo) => {
+    const router = express.Router();
+
+    router.get('/', async (req, res) => {
+        try {
+            const items = await repo.findAll();
+            res.json(items);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
     });
+
+    router.post('/', async (req, res) => {
+        try {
+            const newItem = await repo.create(req.body);
+            res.status(201).json(newItem);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    router.get('/:id', async (req, res) => {
+        try {
+            const item = await repo.findById(req.params.id);
+            if (!item) return res.status(404).json({ error: 'Nicht gefunden' });
+            res.json(item);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    router.put('/:id', async (req, res) => {
+        try {
+            const updatedItem = await repo.update(req.params.id, req.body);
+            if (!updatedItem) return res.status(404).json({ error: 'Nicht gefunden' });
+            res.json(updatedItem);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    router.delete('/:id', async (req, res) => {
+        try {
+            const count = await repo.remove(req.params.id);
+            if (count === 0) return res.status(404).json({ error: 'Nicht gefunden' });
+            res.status(204).send();
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    return router;
+};
+
+// Router anwenden
+app.use('/api/akten', createRouter(aktenRepo));
+app.use('/api/mandanten', createRouter(mandantenRepo));
+app.use('/api/gegner', createRouter(gegnerRepo));
+
+// Auth-Routen
+app.post('/api/login', async (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Benutzername und Passwort sind erforderlich' });
+    }
+
+    try {
+        const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+        const user = result.rows[0];
+
+        if (!user) {
+            return res.status(401).json({ error: 'Ungültige Anmeldeinformationen' });
+        }
+
+        const passwordMatch = await bcrypt.compare(password, user.password_hash);
+        if (!passwordMatch) {
+            return res.status(401).json({ error: 'Ungültige Anmeldeinformationen' });
+        }
+
+        const token = jwt.sign(
+            { userId: user.id, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
+
+        res.json({ token, role: user.role });
+
+    } catch (err) {
+        console.error('Login-Fehler:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
 });
+
+// Server starten
+const startServer = async () => {
+    await initializeDatabase();
+    app.listen(port, () => {
+        console.log(`Server läuft auf http://localhost:${port}`);
+    });
+};
+
+startServer();
