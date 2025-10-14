@@ -94,6 +94,7 @@ export const Stammdatenverwaltung = ({
         mandanten={filteredItems}
         onEdit={handleOpenModal}
         onDelete={handleDelete}
+        userRole={userRole}
       />
 
       <Modal isOpen={isModalOpen} onClose={handleCloseModal}>
