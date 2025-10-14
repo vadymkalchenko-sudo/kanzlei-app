@@ -18,7 +18,11 @@ const unbundleFromJsonb = (item) => {
 };
 
 const findAll = async () => {
-    const result = await pool.query('SELECT * FROM mandanten');
+    // SQL-Befehl: Wählt die festen Spalten und die dynamischen metadaten (JSONB)
+    // Dies entspricht der Anweisung des Benutzers, verwendet aber weiterhin die
+    // unbundleFromJsonb-Funktion, um die Konsistenz mit dem Rest der Anwendung zu gewährleisten.
+    const query = 'SELECT id, name, status, metadaten FROM mandanten';
+    const result = await pool.query(query);
     return result.rows.map(unbundleFromJsonb);
 };
 
