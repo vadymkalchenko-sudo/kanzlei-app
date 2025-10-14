@@ -159,7 +159,7 @@ const createRouter = (repo) => {
 };
 
 // Router anwenden
-app.use('/api/akten', createRouter(aktenRepo));
+app.use('/api/records', createRouter(aktenRepo));
 app.use('/api/mandanten', createRouter(mandantenRepo));
 app.use('/api/gegner', createRouter(gegnerRepo));
 
