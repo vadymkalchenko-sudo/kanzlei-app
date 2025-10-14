@@ -74,6 +74,16 @@ export const updateRecord = (id, data, signal) => apiRequest(`${API_BASE_URL}/re
 });
 export const deleteRecord = (id, signal) => apiRequest(`${API_BASE_URL}/records/${id}`, { method: 'DELETE', signal });
 
+export const uploadDocuments = (recordId, formData, signal) => {
+  // We don't use the generic apiRequest here because FormData needs special handling
+  // and doesn't use 'Content-Type': 'application/json'
+  return fetch(`${API_BASE_URL}/records/${recordId}/documents`, {
+    method: 'POST',
+    body: formData,
+    signal,
+  }).then(handleResponse);
+};
+
 // This is a placeholder, as the backend does not have backup/restore endpoints
 export const exportData = async () => {
   console.warn('Export functionality is not implemented on the backend.');
