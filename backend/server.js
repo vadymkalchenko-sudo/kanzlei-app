@@ -100,6 +100,16 @@ const initializeDatabase = async () => {
         `);
         console.log('Tabelle "gegner" erstellt oder existiert bereits.');
 
+        // Hinzufügen von GIN-Indizes für JSONB-Spalten zur Performance-Optimierung
+        await client.query('CREATE INDEX IF NOT EXISTS idx_gin_mandanten_metadaten ON mandanten USING GIN (metadaten jsonb_path_ops);');
+        console.log('GIN-Index für "mandanten.metadaten" erstellt oder existiert bereits.');
+
+        await client.query('CREATE INDEX IF NOT EXISTS idx_gin_akten_metadaten ON akten USING GIN (metadaten jsonb_path_ops);');
+        console.log('GIN-Index für "akten.metadaten" erstellt oder existiert bereits.');
+
+        await client.query('CREATE INDEX IF NOT EXISTS idx_gin_gegner_metadaten ON gegner USING GIN (metadaten jsonb_path_ops);');
+        console.log('GIN-Index für "gegner.metadaten" erstellt oder existiert bereits.');
+
         // Initialen Admin-Benutzer erstellen, falls nicht vorhanden
         const adminPassword = process.env.ADMIN_INITIAL_PASSWORD;
         if (adminPassword) {
