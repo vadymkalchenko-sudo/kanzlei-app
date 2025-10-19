@@ -84,11 +84,7 @@ export const App = () => {
 
     const handleOpenAkteModal = (akte = null) => {
         setSelectedItem(akte);
-        if (akte) {
-            setCurrentView('akten_detail');
-        } else {
-            setIsModalOpen(true);
-        }
+        setIsModalOpen(true);
     };
 
     const handleGoBackToList = () => {
