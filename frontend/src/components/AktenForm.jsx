@@ -110,7 +110,20 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      let submissionData = { ...formData };
+      // Explicitly pick only the fields needed for the record to avoid passing
+      // non-serializable data like File objects that might be present in formData
+      // due to browser drag-and-drop behavior.
+      const {
+        id, mandantId, status, gegnerId, unfallDatum, kennzeichen,
+        mdtKennzeichen, gegnerKennzeichen, sonstigeBeteiligte, beteiligteDritte,
+        anrede, vorname, nachname, strasse, hausnummer, plz, stadt, email, telefon, iban, notizen
+      } = formData;
+
+      let submissionData = {
+        id, mandantId, status, gegnerId, unfallDatum, kennzeichen,
+        mdtKennzeichen, gegnerKennzeichen, sonstigeBeteiligte, beteiligteDritte,
+        anrede, vorname, nachname, strasse, hausnummer, plz, stadt, email, telefon, iban, notizen
+      };
       let clientJustCreated = false;
 
       if (isNewMandant) {
