@@ -500,13 +500,27 @@ export const useKanzleiLogic = () => {
         beteiligteDritte,
       };
 
+      // Map and sanitize before sending to the API
+      const payloadData = { ...recordData };
+      // 1) Map caseNumber -> aktenzeichen (use existing for update, nextCaseNumber for create)
+      payloadData.aktenzeichen = id ? (records.find(r => r.id === id)?.caseNumber || '') : nextCaseNumber;
+      // 2) Map mandantId -> mandanten_id
+      payloadData.mandanten_id = payloadData.mandantId;
+      // 3) Replace any File instances with empty strings to ensure serializability
+      Object.keys(payloadData).forEach((key) => {
+        const value = payloadData[key];
+        if (typeof File !== 'undefined' && value instanceof File) {
+          payloadData[key] = '';
+        }
+      });
+
       if (id) {
         const originalRecord = records.find(r => r.id === id);
         if (!originalRecord) {
           throw new Error("Original record not found for update.");
         }
 
-        const updatedRecord = { ...originalRecord, ...recordData };
+        const updatedRecord = { ...originalRecord, ...payloadData };
 
         if (updatedRecord.status === 'geschlossen' && originalRecord?.status !== 'geschlossen') {
           const clientForArchiving = mandanten.find(m => m.id === mandantId);
@@ -517,7 +531,7 @@ export const useKanzleiLogic = () => {
         setFlashMessage('Akte erfolgreich aktualisiert!');
       } else {
         const newRecord = {
-            ...recordData,
+            ...payloadData,
             caseNumber: nextCaseNumber,
             dokumente: [],
             notizen: [],
@@ -533,7 +547,8 @@ export const useKanzleiLogic = () => {
 
       fetchData();
     } catch (error) {
-      setFlashMessage(`Fehler: ${error.message}`);
+      setFlashMessage(error.message);
+      console.error(error);
     }
   };
 

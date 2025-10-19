@@ -110,6 +110,7 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      console.log(formData);
       // Explicitly pick only the fields needed for the record to avoid passing
       // non-serializable data like File objects that might be present in formData
       // due to browser drag-and-drop behavior.
@@ -141,6 +142,7 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
         }
       }
 
+      console.log(submissionData);
       onRecordSubmit({ ...submissionData, clientJustCreated, status: akte ? formData.status : 'offen' });
       onCancel();
     } catch (error) {
