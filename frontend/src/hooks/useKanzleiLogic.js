@@ -500,19 +500,21 @@ export const useKanzleiLogic = () => {
         beteiligteDritte,
       };
 
-      // Map and sanitize before sending to the API
+      // Map before sending to the API
       const payloadData = { ...recordData };
       // 1) Map caseNumber -> aktenzeichen (use existing for update, nextCaseNumber for create)
       payloadData.aktenzeichen = id ? (records.find(r => r.id === id)?.caseNumber || '') : nextCaseNumber;
       // 2) Map mandantId -> mandanten_id
       payloadData.mandanten_id = payloadData.mandantId;
-      // 3) Replace any File instances with empty strings to ensure serializability
-      Object.keys(payloadData).forEach((key) => {
-        const value = payloadData[key];
-        if (typeof File !== 'undefined' && value instanceof File) {
-          payloadData[key] = '';
-        }
-      });
+      
+      // Step 1: Extract single file from form input (if present) and remove it from the record payload
+      const fileToUpload = (typeof File !== 'undefined' && formData?.fileAttachment instanceof File)
+        ? formData.fileAttachment
+        : null;
+      if (fileToUpload) {
+        // Ensure payloads contain only serializable JSON
+        delete payloadData.fileAttachment;
+      }
 
       if (id) {
         const originalRecord = records.find(r => r.id === id);
@@ -527,7 +529,14 @@ export const useKanzleiLogic = () => {
           updatedRecord.archivedMandantData = { ...clientForArchiving };
           setFlashMessage('Akte wurde geschlossen und Mandantendaten archiviert.');
         }
-        await api.updateRecord(id, updatedRecord);
+        const savedRecord = await api.updateRecord(id, updatedRecord);
+        if (fileToUpload && savedRecord?.id) {
+          try {
+            await api.uploadDocument(savedRecord.id, fileToUpload);
+          } catch (uploadErr) {
+            console.error('Fehler beim separaten Datei-Upload (Update):', uploadErr);
+          }
+        }
         setFlashMessage('Akte erfolgreich aktualisiert!');
       } else {
         const newRecord = {
@@ -537,7 +546,14 @@ export const useKanzleiLogic = () => {
             notizen: [],
             aufgaben: [],
         };
-        await api.createRecord(newRecord);
+        const createdRecord = await api.createRecord(newRecord);
+        if (fileToUpload && createdRecord?.id) {
+          try {
+            await api.uploadDocument(createdRecord.id, fileToUpload);
+          } catch (uploadErr) {
+            console.error('Fehler beim separaten Datei-Upload (Create):', uploadErr);
+          }
+        }
         if (clientJustCreated) {
           setFlashMessage('Neuer Mandant und Akte erfolgreich angelegt!');
         } else {

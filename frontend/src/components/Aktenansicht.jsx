@@ -224,8 +224,11 @@ export const Aktenansicht = ({
   };
 
   const simplifyFormat = (doc) => {
-    const extension = doc.beschreibung.split('.').pop().toLowerCase();
-    return extension === doc.beschreibung.toLowerCase() ? (doc.format || 'Unbekannt') : extension;
+    const extension = doc?.beschreibung?.split('.')?.pop()?.toLowerCase();
+    if (!extension) {
+      return doc?.format || 'Unbekannt';
+    }
+    return extension === doc?.beschreibung?.toLowerCase() ? (doc?.format || 'Unbekannt') : extension;
   };
 
   const gegner = record.gegnerId && dritteBeteiligte

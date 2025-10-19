@@ -60,23 +60,36 @@ export const deleteDritteBeteiligte = (id, signal) => apiRequest(`${API_BASE_URL
 
 // Akten API
 export const getRecords = (signal) => apiRequest(`${API_BASE_URL}/records`, { signal });
-export const createRecord = (data, signal) => apiRequest(`${API_BASE_URL}/records`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-    signal,
-});
-export const updateRecord = (id, data, signal) => apiRequest(`${API_BASE_URL}/records/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-    signal,
-});
+export const createRecord = (data, signal) => {
+  const isFormData = (typeof FormData !== 'undefined') && (data instanceof FormData);
+  const options = isFormData
+    ? { method: 'POST', body: data, signal }
+    : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), signal };
+  return apiRequest(`${API_BASE_URL}/records`, options);
+};
+export const updateRecord = (id, data, signal) => {
+  const isFormData = (typeof FormData !== 'undefined') && (data instanceof FormData);
+  const options = isFormData
+    ? { method: 'PUT', body: data, signal }
+    : { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), signal };
+  return apiRequest(`${API_BASE_URL}/records/${id}`, options);
+};
 export const deleteRecord = (id, signal) => apiRequest(`${API_BASE_URL}/records/${id}`, { method: 'DELETE', signal });
 
 export const uploadDocuments = (recordId, formData, signal) => {
   // We don't use the generic apiRequest here because FormData needs special handling
   // and doesn't use 'Content-Type': 'application/json'
+  return fetch(`${API_BASE_URL}/records/${recordId}/documents`, {
+    method: 'POST',
+    body: formData,
+    signal,
+  }).then(handleResponse);
+};
+
+// Upload a single document file to a record via dedicated endpoint
+export const uploadDocument = (recordId, file, signal) => {
+  const formData = new FormData();
+  formData.append('documents', file);
   return fetch(`${API_BASE_URL}/records/${recordId}/documents`, {
     method: 'POST',
     body: formData,
