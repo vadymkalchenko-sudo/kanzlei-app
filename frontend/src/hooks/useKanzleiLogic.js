@@ -35,22 +35,7 @@ export const useKanzleiLogic = () => {
   };
 
   const fetchData = useCallback(async (signal) => {
-    // Zwangsmigration: Explizites Laden von localStorage, um es dann durch API-Aufrufe zu ersetzen.
-    // Dieser Block simuliert den von Ihnen beschriebenen Zustand und migriert ihn.
-    const localMandanten = JSON.parse(localStorage.getItem('mandanten') || '[]');
-    const localRecords = JSON.parse(localStorage.getItem('records') || '[]');
-    const localDritte = JSON.parse(localStorage.getItem('dritteBeteiligte') || '[]');
-
-    if (localMandanten.length > 0 || localRecords.length > 0) {
-        console.log("Veraltete lokale Daten gefunden. Beginne Migration zur API.");
-        // Hier könnte eine Logik stehen, um lokale Daten zur API zu migrieren.
-        // Fürs Erste löschen wir die lokalen Daten, um die API als Quelle zu erzwingen.
-        localStorage.removeItem('mandanten');
-        localStorage.removeItem('records');
-        localStorage.removeItem('dritteBeteiligte');
-        setFlashMessage('Lokale Daten wurden entfernt. Lade aktuelle Daten vom Server.');
-    }
-
+    // Komplett auf API-Datenquelle umgestellt - keine localStorage-Migration mehr
     try {
       const [mandantenData, recordsData, dritteData] = await Promise.all([
         api.getMandanten(signal),
@@ -501,20 +486,88 @@ export const useKanzleiLogic = () => {
       };
 
       // Map before sending to the API
-      const payloadData = { ...recordData };
+      let payloadData = { ...recordData };
       // 1) Map caseNumber -> aktenzeichen (use existing for update, nextCaseNumber for create)
       payloadData.aktenzeichen = id ? (records.find(r => r.id === id)?.caseNumber || '') : nextCaseNumber;
       // 2) Map mandantId -> mandanten_id
       payloadData.mandanten_id = payloadData.mandantId;
       
       // Step 1: Extract single file from form input (if present) and remove it from the record payload
-      const fileToUpload = (typeof File !== 'undefined' && formData?.fileAttachment instanceof File)
-        ? formData.fileAttachment
-        : null;
-      if (fileToUpload) {
-        // Ensure payloads contain only serializable JSON
-        delete payloadData.fileAttachment;
-      }
+      const extractFirstFileFromFormData = (data) => {
+        if (!data || typeof File === 'undefined') return null;
+        // Prefer common keys first
+        const preferredKeys = ['fileAttachment', 'file', 'attachment'];
+        for (const key of preferredKeys) {
+          if (data[key] instanceof File) return data[key];
+        }
+        // Fallback: find the first File anywhere at top-level
+        for (const value of Object.values(data)) {
+          if (value instanceof File) return value;
+        }
+        return null;
+      };
+
+      const fileToUpload = extractFirstFileFromFormData(formData);
+
+      // Remove any file and file-related metadata from payload (JSON only)
+      const stripAttachmentMetaFields = (obj) => {
+        const clean = { ...obj };
+        Object.keys(clean).forEach((key) => {
+          const value = clean[key];
+          // Remove any File instances
+          if (typeof File !== 'undefined' && value instanceof File) {
+            delete clean[key];
+            return;
+          }
+          // Remove keys that look like attachment/file metadata
+          if (/file|attachment|anhang/i.test(key)) {
+            delete clean[key];
+            return;
+          }
+          // Remove objects that look like file metadata blobs
+          if (value && typeof value === 'object' && !Array.isArray(value)) {
+            const metaProps = ['name', 'size', 'type', 'lastModified', 'path', 'webkitRelativePath'];
+            const hasAnyMeta = metaProps.some((p) => Object.prototype.hasOwnProperty.call(value, p));
+            if (hasAnyMeta) {
+              delete clean[key];
+            }
+          }
+        });
+        return clean;
+      };
+
+      payloadData = stripAttachmentMetaFields(payloadData);
+
+      // Deep-clean helper to ensure full JSON-serializability (no File/Blob or file-metadata-like objects)
+      const deepCleanSerializable = (value) => {
+        const isPlainObject = (v) => Object.prototype.toString.call(v) === '[object Object]';
+        if (value == null) return value;
+        if (typeof File !== 'undefined' && value instanceof File) return undefined;
+        if (typeof Blob !== 'undefined' && value instanceof Blob) return undefined;
+        if (Array.isArray(value)) {
+          const cleaned = value
+            .map((item) => deepCleanSerializable(item))
+            .filter((item) => item !== undefined);
+          return cleaned;
+        }
+        if (isPlainObject(value)) {
+          const metaProps = ['name', 'size', 'type', 'lastModified', 'path', 'webkitRelativePath'];
+          const hasAnyMeta = metaProps.some((p) => Object.prototype.hasOwnProperty.call(value, p));
+          if (hasAnyMeta) {
+            return undefined;
+          }
+          const out = {};
+          Object.entries(value).forEach(([k, v]) => {
+            // Drop keys that look like file-ish
+            if (/file|attachment|anhang/i.test(k)) return;
+            const cleaned = deepCleanSerializable(v);
+            if (cleaned !== undefined) out[k] = cleaned;
+          });
+          return out;
+        }
+        if (typeof value === 'function') return undefined;
+        return value;
+      };
 
       if (id) {
         const originalRecord = records.find(r => r.id === id);
@@ -522,13 +575,14 @@ export const useKanzleiLogic = () => {
           throw new Error("Original record not found for update.");
         }
 
-        const updatedRecord = { ...originalRecord, ...payloadData };
+        const updatedRecordRaw = { ...originalRecord, ...payloadData };
 
-        if (updatedRecord.status === 'geschlossen' && originalRecord?.status !== 'geschlossen') {
+        if (updatedRecordRaw.status === 'geschlossen' && originalRecord?.status !== 'geschlossen') {
           const clientForArchiving = mandanten.find(m => m.id === mandantId);
-          updatedRecord.archivedMandantData = { ...clientForArchiving };
+          updatedRecordRaw.archivedMandantData = { ...clientForArchiving };
           setFlashMessage('Akte wurde geschlossen und Mandantendaten archiviert.');
         }
+        const updatedRecord = deepCleanSerializable(updatedRecordRaw);
         const savedRecord = await api.updateRecord(id, updatedRecord);
         if (fileToUpload && savedRecord?.id) {
           try {
@@ -539,13 +593,14 @@ export const useKanzleiLogic = () => {
         }
         setFlashMessage('Akte erfolgreich aktualisiert!');
       } else {
-        const newRecord = {
+        const newRecordRaw = {
             ...payloadData,
             caseNumber: nextCaseNumber,
             dokumente: [],
             notizen: [],
             aufgaben: [],
         };
+        const newRecord = deepCleanSerializable(newRecordRaw);
         const createdRecord = await api.createRecord(newRecord);
         if (fileToUpload && createdRecord?.id) {
           try {

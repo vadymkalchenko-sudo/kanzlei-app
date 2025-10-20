@@ -8,8 +8,6 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3001:3001"
-    volumes:
-      - uploads:/app/uploads
     # NEU: Lädt die Datenbank-Zugangsdaten (DB_HOST, DB_USER, etc.) aus der .env-Datei in den Container.
     # Dies stellt sicher, dass 192.168.178.82 verwendet wird, anstatt des Standardwerts 127.0.0.1.
     env_file:
@@ -27,6 +25,3 @@ services:
       - backend
     environment:
       - VITE_API_BASE_URL=http://backend:3001
-
-volumes:
-  uploads:

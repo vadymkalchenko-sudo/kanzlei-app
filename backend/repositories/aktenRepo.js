@@ -22,6 +22,10 @@ const unbundleFromJsonb = (item) => {
 
 const findAll = async () => {
     const result = await pool.query('SELECT * FROM akten');
+    console.log('[DB DEBUG] Akten aus DB geladen:', result.rows.length, 'Einträge');
+    if (result.rows.length > 0) {
+        console.log('[DB DEBUG] Erste Akte:', JSON.stringify(result.rows[0], null, 2));
+    }
     return result.rows.map(unbundleFromJsonb);
 };
 

@@ -9,22 +9,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Sicherstellen, dass das Upload-Verzeichnis existiert
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// Multer-Konfiguration für Datei-Uploads
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, uploadDir);
-    },
-    filename: function (req, file, cb) {
-        cb(null, `${Date.now()}-${file.originalname}`);
-    }
-});
-const upload = multer({ storage: storage });
+// Multer-Konfiguration: Speicher im RAM, KEIN Schreiben auf Festplatte
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Repositories importieren
 const aktenRepo = require('./repositories/aktenRepo');
@@ -148,6 +134,7 @@ const createRouter = (repo) => {
 
     router.post('/', async (req, res) => {
         try {
+            console.log('[DEBUG-PATH] Aktuelles Arbeitsverzeichnis:', process.cwd());
             const newItem = await repo.create(req.body);
             res.status(201).json(newItem);
         } catch (err) {
@@ -167,7 +154,38 @@ const createRouter = (repo) => {
 
     router.put('/:id', async (req, res) => {
         try {
-            const updatedItem = await repo.update(req.params.id, req.body);
+            let body = req.body;
+            // Wenn Status auf 'geschlossen' gesetzt ist: Mandanten-Snapshot ziehen und in metadaten.mandantenSnapshot speichern
+            if (body && body.status === 'geschlossen') {
+                const akteId = req.params.id;
+                // Aktuelle Akte abrufen, um mandanten_id zu bekommen (falls nicht im Body enthalten)
+                const currentAkte = await repo.findById(akteId);
+                const mandantenId = body.mandanten_id || currentAkte?.mandanten_id;
+                if (mandantenId) {
+                    // Mandanten-Datensatz laden (inkl. metadaten)
+                    const { rows } = await pool.query('SELECT * FROM mandanten WHERE id = $1', [mandantenId]);
+                    if (rows.length > 0) {
+                        const mandantRow = rows[0];
+                        // JSONB unbundling analog zu Repo: feste Felder + metadaten zusammenführen
+                        const mandantSnapshot = mandantRow.metadaten
+                            ? { ...mandantRow, ...mandantRow.metadaten }
+                            : mandantRow;
+                        if (mandantSnapshot.metadaten) delete mandantSnapshot.metadaten;
+
+                        // Body so erweitern, dass mandantenSnapshot im JSONB-Feld metadaten landet
+                        const { aktenzeichen, status, mandanten_id, ...restMeta } = body;
+                        body = {
+                            aktenzeichen,
+                            status,
+                            mandanten_id: mandantenId,
+                            ...restMeta,
+                            mandantenSnapshot,
+                        };
+                    }
+                }
+            }
+
+            const updatedItem = await repo.update(req.params.id, body);
             if (!updatedItem) return res.status(404).json({ error: 'Nicht gefunden' });
             res.json(updatedItem);
         } catch (err) {
@@ -196,29 +214,71 @@ app.use('/api/dritte-beteiligte', createRouter(gegnerRepo));
 // Datei-Upload-Route
 app.post('/api/records/:recordId/documents', upload.array('documents'), async (req, res) => {
     const { recordId } = req.params;
+    console.log('[UPLOAD START]', { recordId, filesCount: req.files ? req.files.length : 0 });
     try {
+        console.log('[DEBUG-PATH] Aktuelles Arbeitsverzeichnis:', process.cwd());
         const record = await aktenRepo.findById(recordId);
         if (!record) {
+            console.error('[UPLOAD KRITISCH] Akte nicht gefunden', { recordId });
             return res.status(404).json({ error: 'Akte nicht gefunden' });
         }
 
-        const newDocuments = req.files.map(file => ({
-            id: crypto.randomUUID(),
-            name: file.originalname,
-            path: file.path,
-            mimetype: file.mimetype,
-            size: file.size,
-            createdAt: new Date().toISOString(),
-        }));
+        const files = req.files || [];
+        const newDocuments = files.map(file => {
+            try {
+                const bufferLength = file && Buffer.isBuffer(file.buffer) ? file.buffer.length : 0;
+                console.log('[UPLOAD DATEI]', {
+                    name: file?.originalname,
+                    size: file?.size,
+                    bufferLength,
+                    mimetype: file?.mimetype,
+                });
+
+                const hasValidBuffer = file && Buffer.isBuffer(file.buffer) && file.buffer.length > 0;
+                if (!hasValidBuffer) {
+                    if (file && typeof file.size === 'number' && file.size > 0) {
+                        console.error('[UPLOAD KRITISCH] Puffer leer trotz Dateigröße > 0', {
+                            name: file.originalname,
+                            size: file.size,
+                            bufferLength,
+                        });
+                        const err = new Error(`Upload-Fehler: Datei-Puffer fehlt oder ist leer für ${file.originalname}`);
+                        err.status = 400;
+                        throw err;
+                    }
+                }
+
+                const dataB64 = hasValidBuffer ? file.buffer.toString('base64') : '';
+                console.log('[UPLOAD KONV]', { name: file?.originalname, base64Length: dataB64.length });
+
+                return {
+                    id: crypto.randomUUID(),
+                    name: file.originalname,
+                    mimetype: file.mimetype,
+                    size: file.size,
+                    createdAt: new Date().toISOString(),
+                    data_b64: dataB64,
+                };
+            } catch (e) {
+                console.error('[UPLOAD KRITISCH] Fehler bei Base64-Kodierung der Datei', file?.originalname, e);
+                throw e;
+            }
+        });
+
+        console.log('[UPLOAD DB]', { recordId, documentsToStore: newDocuments.length });
 
         const currentDocuments = record.dokumente || [];
         const updatedDocuments = [...currentDocuments, ...newDocuments];
 
         const updatedRecord = await aktenRepo.update(recordId, { ...record, dokumente: updatedDocuments });
 
+        console.log('[UPLOAD END]', { recordId, totalDocuments: updatedDocuments.length });
         res.status(201).json(updatedRecord);
     } catch (error) {
         console.error('Fehler beim Datei-Upload:', error);
+        if (error && error.status === 400) {
+            return res.status(400).json({ error: error.message });
+        }
         res.status(500).json({ error: 'Interner Serverfehler beim Upload' });
     }
 });
