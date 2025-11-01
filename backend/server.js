@@ -40,11 +40,15 @@ const initializeDatabase = async () => {
         client = await pool.connect();
         console.log('Datenbankverbindung erfolgreich.');
 
-        // FIX: DROP TABLE Befehl MUSS auskommentiert bleiben.
-        // await client.query('DROP TABLE IF EXISTS users, mandanten, akten, gegner CASCADE;');
-        // console.log('Existing tables dropped.');
+        // Lese das korrekte Schema aus der init.sql-Datei
+        const initSqlPath = path.join(__dirname, './init.sql');
+        const initSql = fs.readFileSync(initSqlPath, 'utf-8');
+        
+        // Führe die SQL-Befehle aus der Datei aus
+        await client.query(initSql);
+        console.log('Datenbankschema aus init.sql erfolgreich angewendet.');
 
-        // CREATE TABLE IF NOT EXISTS Befehle müssen bleiben.
+        // Erstelle die 'users'-Tabelle separat, da sie nicht Teil der Anwendungsdaten-Persistenz ist
         await client.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id UUID PRIMARY KEY,
@@ -54,47 +58,6 @@ const initializeDatabase = async () => {
             );
         `);
         console.log('Tabelle "users" erstellt oder existiert bereits.');
-
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS mandanten (
-                id UUID PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                status VARCHAR(255),
-                metadaten JSONB
-            );
-        `);
-        console.log('Tabelle "mandanten" erstellt oder existiert bereits.');
-
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS akten (
-                id UUID PRIMARY KEY,
-                aktenzeichen VARCHAR(255) UNIQUE NOT NULL,
-                status VARCHAR(255),
-                mandanten_id UUID REFERENCES mandanten(id),
-                metadaten JSONB
-            );
-        `);
-        console.log('Tabelle "akten" erstellt oder existiert bereits.');
-
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS gegner (
-                id UUID PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                akten_id UUID REFERENCES akten(id) ON DELETE CASCADE,
-                metadaten JSONB
-            );
-        `);
-        console.log('Tabelle "gegner" erstellt oder existiert bereits.');
-
-        // Hinzufügen von GIN-Indizes für JSONB-Spalten zur Performance-Optimierung
-        await client.query('CREATE INDEX IF NOT EXISTS idx_gin_mandanten_metadaten ON mandanten USING GIN (metadaten jsonb_path_ops);');
-        console.log('GIN-Index für "mandanten.metadaten" erstellt oder existiert bereits.');
-
-        await client.query('CREATE INDEX IF NOT EXISTS idx_gin_akten_metadaten ON akten USING GIN (metadaten jsonb_path_ops);');
-        console.log('GIN-Index für "akten.metadaten" erstellt oder existiert bereits.');
-
-        await client.query('CREATE INDEX IF NOT EXISTS idx_gin_gegner_metadaten ON gegner USING GIN (metadaten jsonb_path_ops);');
-        console.log('GIN-Index für "gegner.metadaten" erstellt oder existiert bereits.');
 
         // Initialen Admin-Benutzer erstellen, falls nicht vorhanden
         const adminPassword = process.env.ADMIN_INITIAL_PASSWORD;
@@ -224,7 +187,9 @@ app.post('/api/records/:recordId/documents', upload.array('documents'), async (r
         }
 
         const files = req.files || [];
-        const newDocuments = files.map(file => {
+        const newDocuments = [];
+
+        for (const file of files) {
             try {
                 const bufferLength = file && Buffer.isBuffer(file.buffer) ? file.buffer.length : 0;
                 console.log('[UPLOAD DATEI]', {
@@ -248,38 +213,105 @@ app.post('/api/records/:recordId/documents', upload.array('documents'), async (r
                     }
                 }
 
-                const dataB64 = hasValidBuffer ? file.buffer.toString('base64') : '';
-                console.log('[UPLOAD KONV]', { name: file?.originalname, base64Length: dataB64.length });
-
-                return {
-                    id: crypto.randomUUID(),
-                    name: file.originalname,
-                    mimetype: file.mimetype,
-                    size: file.size,
-                    createdAt: new Date().toISOString(),
-                    data_b64: dataB64,
-                };
+                // Physisches Speichern der Datei im korrekten Verzeichnis
+                const aktenzeichen = record.aktenzeichen;
+                const targetDir = path.join('/app/documents', aktenzeichen);
+                
+                // Sicherstellen, dass das Verzeichnis existiert
+                await fs.mkdir(targetDir, { recursive: true });
+                
+                // Datei speichern
+                const targetPath = path.join(targetDir, file.originalname);
+                await fs.writeFile(targetPath, file.buffer);
+                console.log('[UPLOAD DATEI GESPEICHERT]', { path: targetPath });
+                
+                // Dokument in DB eentragen (mit relativem Pfad)
+                const relativePath = path.join(aktenzeichen, file.originalname);
+                const doc = await aktenRepo.addDocument(
+                    recordId,
+                    file.originalname,
+                    relativePath,
+                    file.mimetype,
+                    file.size
+                );
+                
+                newDocuments.push(doc);
             } catch (e) {
-                console.error('[UPLOAD KRITISCH] Fehler bei Base64-Kodierung der Datei', file?.originalname, e);
+                console.error('[UPLOAD KRITISCH] Fehler beim Speichern der Datei', file?.originalname, e);
                 throw e;
             }
-        });
+        }
 
         console.log('[UPLOAD DB]', { recordId, documentsToStore: newDocuments.length });
 
-        const currentDocuments = record.dokumente || [];
-        const updatedDocuments = [...currentDocuments, ...newDocuments];
-
-        const updatedRecord = await aktenRepo.update(recordId, { ...record, dokumente: updatedDocuments });
-
-        console.log('[UPLOAD END]', { recordId, totalDocuments: updatedDocuments.length });
-        res.status(201).json(updatedRecord);
+        // Antwort senden
+        console.log('[UPLOAD END]', { recordId, totalDocuments: newDocuments.length });
+        res.status(201).json(newDocuments);
     } catch (error) {
         console.error('Fehler beim Datei-Upload:', error);
         if (error && error.status === 400) {
             return res.status(400).json({ error: error.message });
         }
         res.status(500).json({ error: 'Interner Serverfehler beim Upload' });
+    }
+});
+
+// Route zum Abrufen eines Dokuments
+app.get('/api/documents/:documentId', async (req, res) => {
+    try {
+        const { documentId } = req.params;
+        const document = await aktenRepo.getDocumentById(documentId);
+        
+        if (!document) {
+            return res.status(404).json({ error: 'Dokument nicht gefunden' });
+        }
+        
+        // Datei vom Dateisystem laden und streamen
+        const filePath = path.join('/app/documents', document.pfad);
+        console.log('[DOWNLOAD FILE]', { path: filePath });
+        
+        // Überprüfen, ob die Datei existiert
+        try {
+            await fs.access(filePath);
+            
+            // Datei streamen
+            res.setHeader('Content-Disposition', `inline; filename="${document.dateiname}"`);
+            res.setHeader('Content-Type', 'application/octet-stream');
+            const fileStream = fs.createReadStream(filePath);
+            fileStream.pipe(res);
+            
+            fileStream.on('error', (err) => {
+                console.error('Fehler beim Streamen der Datei:', err);
+                res.status(500).json({ error: 'Fehler beim Laden der Datei' });
+            });
+            
+            fileStream.on('end', () => {
+                console.log('[DOWNLOAD COMPLETE]', { documentId });
+            });
+        } catch (err) {
+            console.error('Datei nicht gefunden:', filePath);
+            res.status(404).json({ error: 'Datei nicht gefunden' });
+        }
+    } catch (error) {
+        console.error('Fehler beim Abrufen des Dokuments:', error);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
+// Route zum Löschen eines Dokuments
+app.delete('/api/documents/:documentId', async (req, res) => {
+    try {
+        const { documentId } = req.params;
+        const deletedCount = await aktenRepo.removeDocument(documentId);
+        
+        if (deletedCount === 0) {
+            return res.status(404).json({ error: 'Dokument nicht gefunden' });
+        }
+        
+        res.status(204).send();
+    } catch (error) {
+        console.error('Fehler beim Löschen des Dokuments:', error);
+        res.status(500).json({ error: 'Interner Serverfehler' });
     }
 });
 

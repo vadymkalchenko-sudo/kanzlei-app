@@ -28,6 +28,7 @@ export const App = () => {
         handleUpdateDocument,
         handleDeleteDocument,
         handleUpdateRecord,
+        handleDeleteRecord,
         handleAddNote,
         handleUpdateNote,
         handleDeleteNote,
@@ -374,6 +375,7 @@ export const App = () => {
                             onDeleteDocument={handleDeleteDocument}
                             onUpdateDocument={handleUpdateDocument}
                             onUpdateRecord={handleUpdateRecord}
+                            onDeleteRecord={handleDeleteRecord}
                             onAddNote={handleAddNote}
                             onUpdateNote={handleUpdateNote}
                             onDeleteNote={handleDeleteNote}

@@ -2,8 +2,14 @@ const API_BASE_URL = 'http://localhost:3001/api';
 
 const handleResponse = async (response) => {
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Network response was not ok' }));
-    throw new Error(error.message || 'Something went wrong');
+    let errorText = 'Unbekannter Fehler';
+    try {
+      const error = await response.json();
+      errorText = error.message || JSON.stringify(error);
+    } catch {
+      errorText = response.statusText || 'Network response was not ok';
+    }
+    throw new Error(`[${response.status}] ${errorText}`);
   }
   if (response.status === 204) {
     return null; // No content
@@ -14,25 +20,29 @@ const handleResponse = async (response) => {
 const apiRequest = async (url, options = {}) => {
   try {
     const response = await fetch(url, options);
-    return handleResponse(response);
+    return await handleResponse(response);
   } catch (error) {
     if (error.name === 'AbortError') {
-      // Ignore abort errors, as they are expected during component unmounts
       return;
     }
-    console.error('API request failed:', error);
     throw error;
   }
 };
 
 // Mandanten API
 export const getMandanten = (signal) => apiRequest(`${API_BASE_URL}/mandanten`, { signal });
-export const createMandant = (data, signal) => apiRequest(`${API_BASE_URL}/mandanten`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(data),
-  signal,
-});
+export const createMandant = async (data, signal) => {
+  try {
+    return await apiRequest(`${API_BASE_URL}/mandanten`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      signal,
+    });
+  } catch (error) {
+    throw error;
+  }
+};
 export const updateMandant = (id, data, signal) => apiRequest(`${API_BASE_URL}/mandanten/${id}`, {
   method: 'PUT',
   headers: { 'Content-Type': 'application/json' },
@@ -43,12 +53,18 @@ export const deleteMandant = (id, signal) => apiRequest(`${API_BASE_URL}/mandant
 
 // Dritte Beteiligte API
 export const getDritteBeteiligte = (signal) => apiRequest(`${API_BASE_URL}/dritte-beteiligte`, { signal });
-export const createDritteBeteiligte = (data, signal) => apiRequest(`${API_BASE_URL}/dritte-beteiligte`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(data),
-  signal,
-});
+export const createDritteBeteiligte = async (data, signal) => {
+  try {
+    return await apiRequest(`${API_BASE_URL}/dritte-beteiligte`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      signal,
+    });
+  } catch (error) {
+    throw error;
+  }
+};
 export const updateDritteBeteiligte = (id, data, signal) => apiRequest(`${API_BASE_URL}/dritte-beteiligte/${id}`, {
   method: 'PUT',
   headers: { 'Content-Type': 'application/json' },
@@ -57,15 +73,18 @@ export const updateDritteBeteiligte = (id, data, signal) => apiRequest(`${API_BA
 });
 export const deleteDritteBeteiligte = (id, signal) => apiRequest(`${API_BASE_URL}/dritte-beteiligte/${id}`, { method: 'DELETE', signal });
 
-
 // Akten API
 export const getRecords = (signal) => apiRequest(`${API_BASE_URL}/records`, { signal });
-export const createRecord = (data, signal) => {
-  const isFormData = (typeof FormData !== 'undefined') && (data instanceof FormData);
-  const options = isFormData
-    ? { method: 'POST', body: data, signal }
-    : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), signal };
-  return apiRequest(`${API_BASE_URL}/records`, options);
+export const createRecord = async (data, signal) => {
+  try {
+    const isFormData = (typeof FormData !== 'undefined') && (data instanceof FormData);
+    const options = isFormData
+      ? { method: 'POST', body: data, signal }
+      : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), signal };
+    return await apiRequest(`${API_BASE_URL}/records`, options);
+  } catch (error) {
+    throw error;
+  }
 };
 export const updateRecord = (id, data, signal) => {
   const isFormData = (typeof FormData !== 'undefined') && (data instanceof FormData);
@@ -77,8 +96,6 @@ export const updateRecord = (id, data, signal) => {
 export const deleteRecord = (id, signal) => apiRequest(`${API_BASE_URL}/records/${id}`, { method: 'DELETE', signal });
 
 export const uploadDocuments = (recordId, formData, signal) => {
-  // We don't use the generic apiRequest here because FormData needs special handling
-  // and doesn't use 'Content-Type': 'application/json'
   return fetch(`${API_BASE_URL}/records/${recordId}/documents`, {
     method: 'POST',
     body: formData,
@@ -86,7 +103,6 @@ export const uploadDocuments = (recordId, formData, signal) => {
   }).then(handleResponse);
 };
 
-// Upload a single document file to a record via dedicated endpoint
 export const uploadDocument = (recordId, file, signal) => {
   const formData = new FormData();
   formData.append('documents', file);
@@ -97,7 +113,6 @@ export const uploadDocument = (recordId, file, signal) => {
   }).then(handleResponse);
 };
 
-// This is a placeholder, as the backend does not have backup/restore endpoints
 export const exportData = async () => {
   console.warn('Export functionality is not implemented on the backend.');
   return Promise.resolve({ mandanten: [], records: [] });

@@ -1,6 +1,28 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:14-alpine
+    container_name: kanzlei_postgres_db
+    env_file:
+      - .env
+    volumes:
+      - type: bind
+        source: ./Test_DB/postgres_data
+        target: /var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: >
+      sh -c "
+        chmod -R 777 /var/lib/postgresql/data &&
+        docker-entrypoint.sh postgres"
+
   backend:
     container_name: kanzlei_backend_dev
     build:
@@ -8,11 +30,32 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3001:3001"
-    # NEU: Lädt die Datenbank-Zugangsdaten (DB_HOST, DB_USER, etc.) aus der .env-Datei in den Container.
-    # Dies stellt sicher, dass 192.168.178.82 verwendet wird, anstatt des Standardwerts 127.0.0.1.
     env_file:
       - .env
-    command: npm start
+    volumes:
+      - type: bind
+        source: ./
+        target: /app
+      - /app/backend/node_modules
+      - type: bind
+        source: ./Test_DB/app_data
+        target: /app/kanzlei-data
+      - type: bind
+        source: ./Test_DB/documents
+        target: /app/documents
+      - type: bind
+        source: ./Test_DB/master_data
+        target: /app/master_data
+      - type: bind
+        source: ./init.sql
+        target: /app/backend/init.sql
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "
+        chmod -R 777 /app/documents /app/master_data &&
+        exec node /app/backend/server.js"
 
   frontend:
     container_name: kanzlei_frontend_dev
@@ -20,8 +63,17 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:80"
+      - "3002:80"
     depends_on:
       - backend
     environment:
       - VITE_API_BASE_URL=http://backend:3001
+
+  adminer:
+    image: adminer
+    container_name: kanzlei_adminer
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres

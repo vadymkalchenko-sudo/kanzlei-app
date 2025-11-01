@@ -4,6 +4,7 @@ import { Modal } from './ui/Modal.jsx';
 import DocumentForm from './DocumentForm.jsx';
 import NoteForm from './NoteForm.jsx';
 import AufgabenPanel from './AufgabenPanel.jsx';
+import ConfirmModal from './ui/ConfirmModal.jsx';
 
 export const Aktenansicht = ({
   record,
@@ -18,6 +19,7 @@ export const Aktenansicht = ({
   onUpdateNote,
   onDeleteNote,
   onUpdateRecord,
+  onDeleteRecord,
   // Aufgaben-Props
   onAddAufgabe,
   onUpdateAufgabe,
@@ -26,6 +28,7 @@ export const Aktenansicht = ({
   userRole,
 }) => {
   const fileInputRef = useRef(null);
+  const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
   const [isEditDocModalOpen, setIsEditDocModalOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
@@ -136,6 +139,15 @@ export const Aktenansicht = ({
     handleCloseNoteModal();
   };
 
+  const handleDeleteAkte = () => {
+    setIsConfirmDeleteModalOpen(true);
+  };
+
+  const confirmDeleteAkte = () => {
+    onDeleteRecord(record.id);
+    onGoBack();
+  };
+
   const base64ToBlob = async (base64, mimeType) => {
     try {
         const response = await fetch(base64);
@@ -157,7 +169,7 @@ export const Aktenansicht = ({
   };
 
   const combinedItems = useMemo(() => {
-    const documents = (record?.dokumente || []).filter(Boolean).map(doc => ({ ...doc, itemType: 'document', date: doc.datum }));
+    const documents = (record?.dokumente || []).filter(Boolean).map(doc => ({ ...doc, itemType: 'document', date: doc.createdAt }));
     const notes = (record?.notizen || []).filter(Boolean).map(note => ({ ...note, itemType: 'note', date: note.aktualisierungsdatum }));
 
     const allItems = [...documents, ...notes];
@@ -180,25 +192,14 @@ export const Aktenansicht = ({
     }, 0);
   }, [combinedItems]);
 
-  const handleOpenDocument = async (doc) => {
-    if (!doc.content) {
-      alert('Dokumenteninhalt nicht gefunden. Die Datei wurde möglicherweise vor der Inhalts-Speicherung hochgeladen.');
-      return;
-    }
-    try {
-        const blob = await base64ToBlob(doc.content, doc.format);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = doc.beschreibung || 'dokument';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    } catch (error) {
-        console.error("Fehler beim Öffnen des Dokuments:", error);
-        alert("Das Dokument konnte nicht geöffnet werden. Bitte überprüfen Sie die Konsole für weitere Details.");
-    }
+  const handleOpenDocument = (documentId, filename, mimetype) => {
+    // Für die neue Implementierung: Aufruf der neuen Dokumenten-Download-Route
+    // In der realen Implementierung würde hier ein API-Aufruf stattfinden
+    // Derzeit simulieren wir das Verhalten
+    console.log('Öffne Dokument:', documentId, filename);
+    // In der echten Implementierung:
+    // window.open(`/api/documents/${documentId}`, '_blank');
+    // Oder alternativ mit fetch und Blob für direkten Download
   };
 
   if (!record || !mandant) {
@@ -224,7 +225,7 @@ export const Aktenansicht = ({
   };
 
   const simplifyFormat = (doc) => {
-    const extension = doc?.beschreibung?.split('.')?.pop()?.toLowerCase();
+    const extension = doc?.name?.split('.')?.pop()?.toLowerCase();
     if (!extension) {
       return doc?.format || 'Unbekannt';
     }
@@ -266,8 +267,13 @@ export const Aktenansicht = ({
                 {netBalance.toFixed(2).replace('.', ',')} €
             </p>
         </div>
-        <div className="ml-4">
+        <div className="ml-4 flex items-center space-x-2">
           <Button onClick={onGoBack}>Zurück zur Übersicht</Button>
+          {canDelete && (
+            <Button onClick={handleDeleteAkte} className="bg-red-600 hover:bg-red-700 text-white">
+              Akte löschen
+            </Button>
+          )}
         </div>
       </div>
 
@@ -295,8 +301,8 @@ export const Aktenansicht = ({
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="font-bold text-lg mb-2 flex items-center">
                 Gegner
-                {gegner && canEdit && (
-                  <button onClick={() => onDirectEdit(gegner, 'dritte')} className="ml-2 p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-full">
+                {canEdit && (
+                  <button onClick={() => onDirectEdit(gegner || {}, 'dritte')} className="ml-2 p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-full">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
                   </button>
                 )}
@@ -352,12 +358,12 @@ export const Aktenansicht = ({
                     combinedItems.map((item) => (
                       <tr
                         key={item.id}
-                        onDoubleClick={() => item.itemType === 'document' ? handleOpenDocument(item) : (canEdit && handleOpenNoteModal(item))}
+                        onDoubleClick={() => item.itemType === 'document' ? handleOpenDocument(item.data_b64, item.name, item.mimetype) : (canEdit && handleOpenNoteModal(item))}
                         className={`hover:bg-gray-50 ${canEdit ? 'cursor-pointer' : ''}`}
                       >
                         <td className="px-4 py-2 border-b text-center">{item.itemType === 'document' ? '📄' : '📝'}</td>
                         <td className="px-4 py-2 border-b">{formatDate(item.date)}</td>
-                        <td className="px-4 py-2 border-b">{item.itemType === 'document' ? item.beschreibung : item.titel}</td>
+                        <td className="px-4 py-2 border-b">{item.itemType === 'document' ? item.name : item.titel}</td>
                         <td className="px-4 py-2 border-b">{item.itemType === 'document' ? simplifyFormat(item) : item.typ}</td>
                         <td className="px-4 py-2 border-b text-right" onClick={() => canEdit && handleCellClick(item, 'soll')}>
                             {editingCell?.id === item.id && editingCell?.field === 'soll' ? (
@@ -396,7 +402,7 @@ export const Aktenansicht = ({
                             {item.itemType === 'document' ? (
                               <>
                                 <button onClick={(e) => { e.stopPropagation(); handleOpenEditModal(item); }} className="p-1 text-blue-600 hover:text-blue-800" title="Bearbeiten">
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
                                 </button>
                                 {canDelete && (
                                   <button onClick={(e) => { e.stopPropagation(); onDeleteDocument(record.id, item.id); }} className="p-1 text-red-600 hover:text-red-800 ml-2" title="Löschen">
@@ -454,6 +460,14 @@ export const Aktenansicht = ({
           <NoteForm note={selectedNote} onSubmit={handleNoteSubmit} onCancel={handleCloseNoteModal} />
         </Modal>
       )}
+
+      <ConfirmModal
+        isOpen={isConfirmDeleteModalOpen}
+        onClose={() => setIsConfirmDeleteModalOpen(false)}
+        onConfirm={confirmDeleteAkte}
+        title="Akte löschen"
+        message="Sind Sie sicher, dass Sie diese Akte endgültig löschen möchten?"
+      />
     </div>
   );
 };

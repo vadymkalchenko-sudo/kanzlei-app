@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/Button.jsx';
 
-const PersonForm = ({ person, onSubmit, onCancel, title }) => {
+const PersonForm = ({ person, onSubmit, onCancel, title, fetchData }) => {
+  // Für Mandanten und Gegner verwenden wir unterschiedliche Formate
   const [formData, setFormData] = useState({
     anrede: '',
     vorname: '',
@@ -18,13 +19,40 @@ const PersonForm = ({ person, onSubmit, onCancel, title }) => {
   });
 
   useEffect(() => {
-    if (person && person.name) {
-      const nameParts = person.name.split(' ') || ['', ''];
-      const vorname = nameParts[0];
-      const nachname = nameParts.slice(1).join(' ');
-      setFormData(prev => ({ ...prev, ...person, vorname, nachname }));
+    // Wenn person Daten enthält, müssen wir diese entsprechend aufbereiten
+    if (person) {
+      // Für Mandanten/Gegner, die aus dem Backend kommen, könnten einige Felder anders benannt sein
+      let preparedData = { ...person };
+      
+      // Wenn es sich um einen Mandanten handelt, könnte der Name in verschiedenen Feldern vorliegen
+      if (person.name && !person.vorname && !person.nachname) {
+        const nameParts = person.name.split(' ') || ['', ''];
+        const vorname = nameParts[0];
+        const nachname = nameParts.slice(1).join(' ');
+        preparedData = { ...preparedData, vorname, nachname };
+      }
+      
+      // Wenn es sich um ein Objekt mit Adresse handelt, müssen wir die Felder extrahieren
+      if (person.adresse) {
+        const { strasse, hausnummer, plz, stadt } = person.adresse;
+        preparedData = { ...preparedData, strasse, hausnummer, plz, stadt };
+      }
+      
+      setFormData(preparedData);
     } else {
-      setFormData(prev => ({ ...prev, ...person }));
+      setFormData({
+        anrede: '',
+        vorname: '',
+        nachname: '',
+        strasse: '',
+        hausnummer: '',
+        plz: '',
+        stadt: '',
+        email: '',
+        telefon: '',
+        iban: '',
+        notizen: '',
+      });
     }
   }, [person]);
 
@@ -33,17 +61,38 @@ const PersonForm = ({ person, onSubmit, onCancel, title }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const { vorname, nachname, ...rest } = formData;
-    const name = `${vorname} ${nachname}`.trim();
-    onSubmit({ ...rest, name });
-    onCancel();
+    setError(null);
+    setSuccess(false);
+    try {
+      // Wenn Vorname und Nachname vorhanden sind, kombinieren wir sie zu einem Namen
+      const { vorname, nachname, ...rest } = formData;
+      let finalData = { ...rest };
+      if (vorname || nachname) {
+        const name = `${vorname} ${nachname}`.trim();
+        finalData = { ...finalData, name };
+      }
+      await onSubmit(finalData);
+      setSuccess(true);
+      // Nach erfolgreichem Speichern: Datenliste aktualisieren
+      if (typeof fetchData === 'function') {
+        await fetchData();
+      }
+      onCancel();
+    } catch (err) {
+      setError(err.message || 'Fehler beim Speichern.');
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="p-6 bg-white rounded-lg">
       <h3 className="text-xl font-bold mb-6 text-gray-800">{title}</h3>
+      {error && <div className="text-red-600 mb-2">{error}</div>}
+      {success && <div className="text-green-600 mb-2">Datensatz erfolgreich gespeichert!</div>}
       <div className="space-y-4">
         <select name="anrede" value={formData.anrede} onChange={handleChange} className="input-field w-full">
           <option value="">Anrede</option>

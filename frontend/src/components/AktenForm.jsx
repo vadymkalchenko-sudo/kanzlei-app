@@ -125,6 +125,10 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
         mdtKennzeichen, gegnerKennzeichen, sonstigeBeteiligte, beteiligteDritte,
         anrede, vorname, nachname, strasse, hausnummer, plz, stadt, email, telefon, iban, notizen
       };
+
+      if (!akte) {
+        delete submissionData.id;
+      }
       let clientJustCreated = false;
 
       if (isNewMandant) {
@@ -277,15 +281,15 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
       </div>
 
       <Modal isOpen={isAddBeteiligteModalOpen} onClose={() => setIsAddBeteiligteModalOpen(false)}>
-        <PersonForm onSubmit={handleAddBeteiligteSubmit} onCancel={() => setIsAddBeteiligteModalOpen(false)} title="Neuen Beteiligten anlegen" />
+        <PersonForm onSubmit={handleAddBeteiligteSubmit} onCancel={() => setIsAddBeteiligteModalOpen(false)} title="Neuen Beteiligten anlegen" fetchData={handleDritteSubmit} />
       </Modal>
 
       <Modal isOpen={isAddMandantModalOpen} onClose={() => setIsAddMandantModalOpen(false)}>
-        <PersonForm onSubmit={handleAddMandantSubmit} onCancel={() => setIsAddMandantModalOpen(false)} title="Neuen Mandant anlegen" />
+        <PersonForm onSubmit={handleAddMandantSubmit} onCancel={() => setIsAddMandantModalOpen(false)} title="Neuen Mandant anlegen" fetchData={handleMandantSubmit} />
       </Modal>
 
       <Modal isOpen={isAddGegnerModalOpen} onClose={() => setIsAddGegnerModalOpen(false)}>
-        <PersonForm onSubmit={handleAddGegnerSubmit} onCancel={() => setIsAddGegnerModalOpen(false)} title="Neuen Gegner anlegen" />
+        <PersonForm onSubmit={handleAddGegnerSubmit} onCancel={() => setIsAddGegnerModalOpen(false)} title="Neuen Gegner anlegen" fetchData={handleDritteSubmit} />
       </Modal>
     </form>
   );

@@ -140,7 +140,7 @@ export const useKanzleiLogic = () => {
       return newMandant;
     } catch (error) {
       setFlashMessage(`Fehler: ${error.message}`);
-      return null;
+      throw error;
     }
   };
 
@@ -465,7 +465,8 @@ export const useKanzleiLogic = () => {
     try {
       const { clientJustCreated, ...recordFormData } = formData;
       const {
-        id, mandantId, status, gegnerId, unfallDatum, kennzeichen,
+        id: recordId, // Explizit als Akten-ID benennen
+        mandantId, status, gegnerId, unfallDatum, kennzeichen,
         mdtKennzeichen, gegnerKennzeichen, sonstigeBeteiligte, beteiligteDritte
       } = recordFormData;
 
@@ -488,7 +489,7 @@ export const useKanzleiLogic = () => {
       // Map before sending to the API
       let payloadData = { ...recordData };
       // 1) Map caseNumber -> aktenzeichen (use existing for update, nextCaseNumber for create)
-      payloadData.aktenzeichen = id ? (records.find(r => r.id === id)?.caseNumber || '') : nextCaseNumber;
+      payloadData.aktenzeichen = recordId ? (records.find(r => r.id === recordId)?.caseNumber || '') : nextCaseNumber;
       // 2) Map mandantId -> mandanten_id
       payloadData.mandanten_id = payloadData.mandantId;
       
@@ -569,8 +570,8 @@ export const useKanzleiLogic = () => {
         return value;
       };
 
-      if (id) {
-        const originalRecord = records.find(r => r.id === id);
+      if (recordId) {
+        const originalRecord = records.find(r => r.id === recordId);
         if (!originalRecord) {
           throw new Error("Original record not found for update.");
         }
@@ -583,7 +584,7 @@ export const useKanzleiLogic = () => {
           setFlashMessage('Akte wurde geschlossen und Mandantendaten archiviert.');
         }
         const updatedRecord = deepCleanSerializable(updatedRecordRaw);
-        const savedRecord = await api.updateRecord(id, updatedRecord);
+        const savedRecord = await api.updateRecord(recordId, updatedRecord);
         if (fileToUpload && savedRecord?.id) {
           try {
             await api.uploadDocument(savedRecord.id, fileToUpload);

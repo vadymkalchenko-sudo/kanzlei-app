@@ -14,7 +14,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "PUBLIC_URL=. VITE_API_BASE_URL=http://backend:3001 react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

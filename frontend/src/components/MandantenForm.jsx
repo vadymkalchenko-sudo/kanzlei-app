@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from './ui/Button.jsx';
 
-const MandantenForm = ({ mandant, onSubmit, onCancel }) => {
+const MandantenForm = ({ mandant, onSubmit, onCancel, fetchData }) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -16,10 +16,24 @@ const MandantenForm = ({ mandant, onSubmit, onCancel }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit(formData);
-    onCancel();
+    setError(null);
+    setSuccess(false);
+    try {
+      await onSubmit(formData);
+      setSuccess(true);
+      // Nach erfolgreichem Speichern: Datenliste aktualisieren
+      if (typeof fetchData === 'function') {
+        await fetchData();
+      }
+      onCancel();
+    } catch (err) {
+      setError(err.message || 'Fehler beim Speichern.');
+    }
   };
 
   return (
@@ -27,6 +41,8 @@ const MandantenForm = ({ mandant, onSubmit, onCancel }) => {
       <h3 className="text-xl font-bold mb-4">
         {mandant ? 'Mandanten bearbeiten' : 'Neuen Mandanten anlegen'}
       </h3>
+      {error && <div className="text-red-600 mb-2">{error}</div>}
+      {success && <div className="text-green-600 mb-2">Mandant erfolgreich gespeichert!</div>}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="mb-4">
           <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="name">
