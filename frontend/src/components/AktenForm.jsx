@@ -29,7 +29,8 @@ const initialFormData = {
 export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, onCancel, nextCaseNumber, handleDritteSubmit, handleMandantSubmit }) => {
   const [formData, setFormData] = useState({ ...initialFormData, ...akte });
   const [isNewMandant, setIsNewMandant] = useState(!akte?.mandantId);
-
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [dritteSearch, setDritteSearch] = useState('');
   const [selectedDritte, setSelectedDritte] = useState([]);
   const [isBeteiligteOpen, setIsBeteiligteOpen] = useState(false);
@@ -109,11 +110,10 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setSuccessMessage('');
+
     try {
-      console.log(formData);
-      // Explicitly pick only the fields needed for the record to avoid passing
-      // non-serializable data like File objects that might be present in formData
-      // due to browser drag-and-drop behavior.
       const {
         id, mandantId, status, gegnerId, unfallDatum, kennzeichen,
         mdtKennzeichen, gegnerKennzeichen, sonstigeBeteiligte, beteiligteDritte,
@@ -129,28 +129,37 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
       if (!akte) {
         delete submissionData.id;
       }
+
       let clientJustCreated = false;
+      let finalMandantId = submissionData.mandantId;
 
       if (isNewMandant) {
         const { anrede, vorname, nachname, strasse, hausnummer, plz, stadt, email, telefon, iban, notizen } = formData;
         const name = `${vorname} ${nachname}`.trim();
         const mandantData = { anrede, name, strasse, hausnummer, plz, stadt, email, telefon, iban, notizen };
-
+        
         const newMandant = await handleMandantSubmit(mandantData, { showMessage: false, fetchData: false });
         if (newMandant && newMandant.id) {
-          submissionData.mandantId = newMandant.id;
+          finalMandantId = newMandant.id;
           clientJustCreated = true;
         } else {
-          console.error("Failed to create new client.");
-          return;
+          throw new Error("Mandant konnte nicht erstellt werden.");
         }
       }
+      
+      submissionData.mandantId = finalMandantId;
 
-      console.log(submissionData);
-      onRecordSubmit({ ...submissionData, clientJustCreated, status: akte ? formData.status : 'offen' });
-      onCancel();
+      await onRecordSubmit({ ...submissionData, clientJustCreated, status: akte ? formData.status : 'offen' });
+      
+      setSuccessMessage('Akte erfolgreich gespeichert!');
+      setFormData(initialFormData); // Reset form
+      setTimeout(() => {
+          onCancel(); // Close form after a delay
+      }, 1500);
+
     } catch (error) {
-      console.error("Error during form submission:", error);
+      console.error("Fehler beim Senden des Formulars:", error);
+      setError(error.message || "Ein unbekannter Fehler ist aufgetreten.");
     }
   };
 
@@ -161,6 +170,8 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
   return (
     <form onSubmit={handleSubmit} className="p-4">
       <h3 className="text-2xl font-bold mb-6 text-center">{akte ? 'Akte bearbeiten' : 'Neue Akte anlegen'}</h3>
+      {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">{error}</div>}
+      {successMessage && <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">{successMessage}</div>}
       <div className="flex flex-col md:flex-row gap-8">
         <div className="flex-1 p-4 border rounded-lg bg-gray-50">
           <h4 className="text-xl font-semibold mb-4 border-b pb-2">Mandanten-Daten</h4>

@@ -1,25 +1,38 @@
+import { getToken } from './services/authService';
+
 const API_BASE_URL = 'http://localhost:3001/api';
 
 const handleResponse = async (response) => {
   if (!response.ok) {
-    let errorText = 'Unbekannter Fehler';
-    try {
-      const error = await response.json();
-      errorText = error.message || JSON.stringify(error);
-    } catch {
-      errorText = response.statusText || 'Network response was not ok';
+    if (response.status === 401 || response.status === 403) {
+      // Token ist ungültig oder abgelaufen
+      sessionStorage.removeItem('authToken');
+      sessionStorage.removeItem('userRole');
+      window.location.reload(); // Seite neu laden, um zum Login zu zwingen
+      throw new Error('Sitzung abgelaufen. Bitte erneut anmelden.');
     }
-    throw new Error(`[${response.status}] ${errorText}`);
+    const errorData = await response.json().catch(() => null);
+    const message = errorData?.message || response.statusText;
+    throw new Error(message);
   }
   if (response.status === 204) {
-    return null; // No content
+    return []; // Return empty array for No Content to ensure consistency
   }
   return response.json();
 };
 
 const apiRequest = async (url, options = {}) => {
   try {
-    const response = await fetch(url, options);
+    const token = getToken();
+    const headers = {
+      ...options.headers,
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, { ...options, headers });
     return await handleResponse(response);
   } catch (error) {
     if (error.name === 'AbortError') {
@@ -95,22 +108,39 @@ export const updateRecord = (id, data, signal) => {
 };
 export const deleteRecord = (id, signal) => apiRequest(`${API_BASE_URL}/records/${id}`, { method: 'DELETE', signal });
 
+// Notizen API
+export const addNote = (recordId, noteData) => apiRequest(`${API_BASE_URL}/records/${recordId}/notes`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(noteData),
+});
+
+export const updateNote = (recordId, noteId, noteData) => apiRequest(`${API_BASE_URL}/records/${recordId}/notes/${noteId}`, {
+  method: 'PUT',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(noteData),
+});
+
+export const deleteNote = (recordId, noteId) => apiRequest(`${API_BASE_URL}/records/${recordId}/notes/${noteId}`, {
+  method: 'DELETE',
+});
+
 export const uploadDocuments = (recordId, formData, signal) => {
-  return fetch(`${API_BASE_URL}/records/${recordId}/documents`, {
+  return apiRequest(`${API_BASE_URL}/records/${recordId}/documents`, {
     method: 'POST',
     body: formData,
     signal,
-  }).then(handleResponse);
+  });
 };
 
 export const uploadDocument = (recordId, file, signal) => {
   const formData = new FormData();
   formData.append('documents', file);
-  return fetch(`${API_BASE_URL}/records/${recordId}/documents`, {
+  return apiRequest(`${API_BASE_URL}/records/${recordId}/documents`, {
     method: 'POST',
     body: formData,
     signal,
-  }).then(handleResponse);
+  });
 };
 
 export const exportData = async () => {

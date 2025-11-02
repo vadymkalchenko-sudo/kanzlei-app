@@ -36,35 +36,42 @@ const deleteFileIfExists = async (filePath) => {
 };
 
 const findAll = async () => {
-    const result = await pool.query('SELECT * FROM akten');
-    console.log('[DB DEBUG] Akten aus DB geladen:', result.rows.length, 'Einträge');
-    if (result.rows.length > 0) {
-        console.log('[DB DEBUG] Erste Akte:', JSON.stringify(result.rows[0], null, 2));
-    }
-    return result.rows;
+    const aktenResult = await pool.query('SELECT * FROM akten');
+    const notizenResult = await pool.query('SELECT * FROM notizen');
+    const akten = aktenResult.rows.map(akte => ({
+        ...akte,
+        notizen: notizenResult.rows.filter(n => n.akte_id === akte.id)
+    }));
+    return akten;
 };
 
 const findById = async (id) => {
-    const result = await pool.query('SELECT * FROM akten WHERE id = $1', [id]);
-    if (result.rows.length === 0) {
-        return null;
-    }
-    return result.rows[0];
+    const akteResult = await pool.query('SELECT * FROM akten WHERE id = $1', [id]);
+    if (akteResult.rows.length === 0) return null;
+    const akte = akteResult.rows[0];
+    const notizenResult = await pool.query('SELECT * FROM notizen WHERE akte_id = $1', [id]);
+    akte.notizen = notizenResult.rows;
+    return akte;
 };
 
 const create = async (body) => {
-    const { aktenzeichen, status, mandanten_id, dokumente_pfad } = body;
-    const id = body.id || crypto.randomUUID();
+    try {
+        const { aktenzeichen, status = 'Offen', mandanten_id, dokumente_pfad } = body;
+        const id = body.id || crypto.randomUUID();
 
-    const query = `
-        INSERT INTO akten (id, aktenzeichen, status, mandanten_id, dokumente_pfad)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING *
-    `;
-    const values = [id, aktenzeichen, status, mandanten_id, dokumente_pfad];
+        const query = `
+            INSERT INTO akten (id, aktenzeichen, status, mandanten_id, dokumente_pfad)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *
+        `;
+        const values = [id, aktenzeichen, status, mandanten_id, dokumente_pfad];
 
-    const result = await pool.query(query, values);
-    return result.rows[0];
+        const result = await pool.query(query, values);
+        return result.rows[0];
+    } catch (error) {
+        console.error('Fehler beim Erstellen einer neuen Akte:', error);
+        throw error;
+    }
 };
 
 const update = async (id, body) => {
@@ -191,4 +198,31 @@ module.exports = {
     getDocumentsForAkte,
     getDocumentById,
     removeDocument,
+    addNote: async (akteId, noteData) => {
+        const { titel, inhalt, typ, betrag_soll, betrag_haben, autor } = noteData;
+        const id = `note_${crypto.randomUUID()}`;
+        const query = `
+            INSERT INTO notizen (id, akte_id, titel, inhalt, typ, betrag_soll, betrag_haben, autor)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *
+        `;
+        const values = [id, akteId, titel, inhalt, typ, betrag_soll || 0, betrag_haben || 0, autor || 'System'];
+        const result = await pool.query(query, values);
+        return result.rows[0];
+    },
+    updateNote: async (noteId, noteData) => {
+        const { titel, inhalt, typ, betrag_soll, betrag_haben, erledigt } = noteData;
+        const query = `
+            UPDATE notizen
+            SET titel = $1, inhalt = $2, typ = $3, betrag_soll = $4, betrag_haben = $5, erledigt = $6, aktualisierungsdatum = CURRENT_TIMESTAMP
+            WHERE id = $7
+            RETURNING *
+        `;
+        const values = [titel, inhalt, typ, betrag_soll, betrag_haben, erledigt, noteId];
+        const result = await pool.query(query, values);
+        return result.rows[0];
+    },
+    deleteNote: async (noteId) => {
+        await pool.query('DELETE FROM notizen WHERE id = $1', [noteId]);
+    },
 };

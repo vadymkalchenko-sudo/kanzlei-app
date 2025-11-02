@@ -14,6 +14,10 @@ const pool = new Pool({
 // Hilfsfunktion zum Schreiben von JSON-Dateien
 const writeJsonFile = async (filePath, data) => {
     try {
+        // Sicherstellen, dass das Verzeichnis existiert
+        const dirname = path.dirname(filePath);
+        await fs.mkdir(dirname, { recursive: true });
+
         await fs.writeFile(filePath, JSON.stringify(data, null, 2));
         console.log(`JSON-Datei geschrieben: ${filePath}`);
     } catch (error) {
@@ -85,15 +89,23 @@ const findById = async (id) => {
     }
 };
 
-const create = async (body) => {
+const create = async (mandantData) => {
     try {
-        const { name, status, ...stammdaten } = body;
-        const id = body.id || crypto.randomUUID();
+        const { id: bodyId, ...stammdaten_json } = mandantData;
+        const id = bodyId || crypto.randomUUID();
+
+        // Name Sicherstellung
+        const name = (stammdaten_json.vorname && stammdaten_json.nachname)
+            ? `${stammdaten_json.vorname} ${stammdaten_json.nachname}`
+            : `Mandant-${id.substring(0, 8)}`;
+
+        // Status Sicherstellung
+        const status = stammdaten_json.status || 'Aktiv';
         
         // JSON-Datei schreiben
         const jsonFilePath = `mandanten/${id}.json`;
         const fullPath = path.join('/app/master_data', jsonFilePath);
-        await writeJsonFile(fullPath, stammdaten);
+        await writeJsonFile(fullPath, stammdaten_json);
         
         // Pfad in DB speichern
         const query = `
@@ -107,10 +119,10 @@ const create = async (body) => {
         const dbResult = result.rows[0];
         
         // Kombinierte Daten zurückgeben
-        return { ...dbResult, ...stammdaten };
+        return { ...dbResult, ...stammdaten_json };
     } catch (error) {
         console.error('Fehler beim Erstellen eines neuen Mandanten:', error);
-        return null;
+        throw error;
     }
 };
 

@@ -61,7 +61,7 @@ export const AktenList = ({ records, mandanten, onEdit }) => {
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {records.map((record) => {
-            const mandant = mandanten.find(m => m.id === record.mandantId);
+            const mandant = mandanten.find(m => m.id === record.mandanten_id);
             const deadlineStatus = getDeadlineStatus(record);
             return (
               <tr key={record.id} className="hover:bg-gray-50 transition-colors">
@@ -71,7 +71,7 @@ export const AktenList = ({ records, mandanten, onEdit }) => {
                       ⏰
                     </span>
                   )}
-                  {record.caseNumber}
+                  {record.aktenzeichen}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{mandant ? mandant.name : 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
@@ -79,12 +79,12 @@ export const AktenList = ({ records, mandanten, onEdit }) => {
                     {record.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{record.gegner || 'N/A'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{record.schadenDatum || 'N/A'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{record.kennzeichen || 'N/A'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{record.gegner_name || 'N/A'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{record.unfall_datum ? new Date(record.unfall_datum).toLocaleDateString() : 'N/A'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{record.mandanten_kennzeichen || 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button
-                    onClick={() => onEdit(record)}
+                    onClick={() => onEdit(record.id)}
                     className="text-indigo-600 hover:text-indigo-900 font-semibold"
                   >
                     Bearbeiten

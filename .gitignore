@@ -10,3 +10,4 @@
 
 # Umgebungsvariablen-Datei - darf nicht committet werden
 .env
+Test_DB/

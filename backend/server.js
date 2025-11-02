@@ -44,6 +44,10 @@ const initializeDatabase = async () => {
         const initSqlPath = path.join(__dirname, './init.sql');
         const initSql = fs.readFileSync(initSqlPath, 'utf-8');
         
+        // Tabellen zwangsweise löschen für einen sauberen Start
+        await client.query('DROP TABLE IF EXISTS dokumente, akten, gegner, mandanten, users CASCADE;');
+        console.log('Alte Tabellen gelöscht.');
+
         // Führe die SQL-Befehle aus der Datei aus
         await client.query(initSql);
         console.log('Datenbankschema aus init.sql erfolgreich angewendet.');
@@ -101,7 +105,8 @@ const createRouter = (repo) => {
             const newItem = await repo.create(req.body);
             res.status(201).json(newItem);
         } catch (err) {
-            res.status(500).json({ error: err.message });
+            console.error('[CREATE-FEHLER]', err); // Detailliertes Logging
+            res.status(500).json({ message: err.message, stack: err.stack }); // Mehr Details in der Antwort
         }
     });
 
@@ -169,13 +174,59 @@ const createRouter = (repo) => {
     return router;
 };
 
-// Router anwenden
-app.use('/api/records', createRouter(aktenRepo));
-app.use('/api/mandanten', createRouter(mandantenRepo));
-app.use('/api/dritte-beteiligte', createRouter(gegnerRepo));
+// Authentifizierungs-Middleware
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (token == null) return res.sendStatus(401);
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (err) return res.sendStatus(403);
+        req.user = user;
+        next();
+    });
+};
+
+// Router anwenden (jetzt mit Authentifizierung)
+app.use('/api/records', authenticateToken, createRouter(aktenRepo));
+app.use('/api/mandanten', authenticateToken, createRouter(mandantenRepo));
+app.use('/api/dritte-beteiligte', authenticateToken, createRouter(gegnerRepo));
+
+// --- Spezifische Routen für Notizen ---
+app.post('/api/records/:recordId/notes', authenticateToken, async (req, res) => {
+    try {
+        const newNote = await aktenRepo.addNote(req.params.recordId, req.body);
+        res.status(201).json(newNote);
+    } catch (err) {
+        console.error('[CREATE-NOTE-FEHLER]', err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
+app.put('/api/records/:recordId/notes/:noteId', authenticateToken, async (req, res) => {
+    try {
+        const updatedNote = await aktenRepo.updateNote(req.params.noteId, req.body);
+        res.json(updatedNote);
+    } catch (err) {
+        console.error('[UPDATE-NOTE-FEHLER]', err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
+app.delete('/api/records/:recordId/notes/:noteId', authenticateToken, async (req, res) => {
+    try {
+        await aktenRepo.deleteNote(req.params.noteId);
+        res.status(204).send();
+    } catch (err) {
+        console.error('[DELETE-NOTE-FEHLER]', err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
 
 // Datei-Upload-Route
-app.post('/api/records/:recordId/documents', upload.array('documents'), async (req, res) => {
+app.post('/api/records/:recordId/documents', authenticateToken, upload.array('documents'), async (req, res) => {
     const { recordId } = req.params;
     console.log('[UPLOAD START]', { recordId, filesCount: req.files ? req.files.length : 0 });
     try {

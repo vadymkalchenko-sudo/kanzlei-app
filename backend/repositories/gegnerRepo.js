@@ -14,6 +14,10 @@ const pool = new Pool({
 // Hilfsfunktion zum Schreiben von JSON-Dateien
 const writeJsonFile = async (filePath, data) => {
     try {
+        // Sicherstellen, dass das Verzeichnis existiert
+        const dirname = path.dirname(filePath);
+        await fs.mkdir(dirname, { recursive: true });
+
         await fs.writeFile(filePath, JSON.stringify(data, null, 2));
         console.log(`JSON-Datei geschrieben: ${filePath}`);
     } catch (error) {
@@ -87,9 +91,14 @@ const findById = async (id) => {
 
 const create = async (body) => {
     try {
-        const { name, akten_id, ...stammdaten } = body;
+        const { akten_id, ...stammdaten } = body;
         const id = body.id || crypto.randomUUID();
-        
+
+        // Name aus Stammdaten oder ID generieren
+        const name = (stammdaten.vorname && stammdaten.nachname)
+            ? `${stammdaten.vorname} ${stammdaten.nachname}`
+            : (stammdaten.name || id);
+
         // JSON-Datei schreiben
         const jsonFilePath = `gegner/${id}.json`;
         const fullPath = path.join('/app/master_data', jsonFilePath);
@@ -110,7 +119,7 @@ const create = async (body) => {
         return { ...dbResult, ...stammdaten };
     } catch (error) {
         console.error('Fehler beim Erstellen eines neuen Gegners:', error);
-        return null;
+        throw error;
     }
 };
 

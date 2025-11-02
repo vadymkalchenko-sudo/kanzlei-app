@@ -13,7 +13,7 @@ const generateNewCaseNumber = (totalRecords) => {
  * Ein benutzerdefinierter Hook, der die gesamte Geschäftslogik der Anwendung kapselt.
  * Er interagiert mit der API-Schicht, um Daten zu verwalten.
  */
-export const useKanzleiLogic = () => {
+export const useKanzleiLogic = (isLoggedIn) => {
   const [isAppReady, setIsAppReady] = useState(false);
   const [records, setRecords] = useState([]);
   const [mandanten, setMandanten] = useState([]);
@@ -35,23 +35,24 @@ export const useKanzleiLogic = () => {
   };
 
   const fetchData = useCallback(async (signal) => {
-    // Komplett auf API-Datenquelle umgestellt - keine localStorage-Migration mehr
     try {
-      const [mandantenData, recordsData, dritteData] = await Promise.all([
-        api.getMandanten(signal),
-        api.getRecords(signal),
-        api.getDritteBeteiligte(signal),
-      ]);
+      console.log("--- [FETCH START] ---");
+      const mandantenData = await api.getMandanten(signal);
+      console.log("[FETCH SUCCESS] Mandanten:", mandantenData);
+      setMandanten(mandantenData || []);
 
-      if (!mandantenData || !recordsData || !dritteData) {
-        return;
-      }
+      const recordsData = await api.getRecords(signal);
+      console.log("[FETCH SUCCESS] Akten:", recordsData);
+      setRecords(recordsData || []);
 
-      setMandanten(mandantenData);
-      setRecords(recordsData);
-      setDritteBeteiligte(dritteData);
+      const dritteData = await api.getDritteBeteiligte(signal);
+      console.log("[FETCH SUCCESS] Dritte:", dritteData);
+      setDritteBeteiligte(dritteData || []);
+      console.log("--- [FETCH END] ---");
+
     } catch (error) {
       if (error.name !== 'AbortError') {
+        console.error("[FETCH ERROR]", error);
         setFlashMessage(`Fehler beim Laden der Daten: ${error.message}`);
       }
     } finally {
@@ -67,7 +68,7 @@ export const useKanzleiLogic = () => {
     return records.filter(record => {
       const mandant = mandanten.find(m => m.id === record.mandantId);
       const clientName = mandant ? mandant.name.toLowerCase() : '';
-      const caseNumber = record.caseNumber.toLowerCase();
+      const caseNumber = record.aktenzeichen.toLowerCase();
       return clientName.includes(lowercasedFilter) || caseNumber.includes(lowercasedFilter);
     });
   }, [searchTerm, records, mandanten]);
@@ -115,13 +116,15 @@ export const useKanzleiLogic = () => {
   }, [records]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetchData(controller.signal);
+    if (isLoggedIn) {
+      const controller = new AbortController();
+      fetchData(controller.signal);
 
-    return () => {
-      controller.abort();
-    };
-  }, [fetchData]);
+      return () => {
+        controller.abort();
+      };
+    }
+  }, [isLoggedIn, fetchData]);
 
   const handleMandantSubmit = async (mandantData, options = { showMessage: true, fetchData: true }) => {
     try {
@@ -207,28 +210,7 @@ export const useKanzleiLogic = () => {
 
   const handleAddNote = async (recordId, noteData) => {
     try {
-      const recordToUpdate = records.find(r => r.id === recordId);
-      if (!recordToUpdate) throw new Error('Akte nicht gefunden');
-
-      const now = new Date().toISOString();
-      const newNote = {
-        id: `note_${new Date().getTime()}`,
-        akte_id: recordId,
-        ...noteData,
-        betrag_soll: 0,
-        betrag_haben: 0,
-        autor: 'Sachbearbeiter_A', // Hardcoded as per spec for now
-        typ: 'Notiz/Vermerk',
-        erstelldatum: now,
-        aktualisierungsdatum: now,
-      };
-
-      const updatedRecord = {
-        ...recordToUpdate,
-        notizen: [...(recordToUpdate.notizen || []), newNote],
-      };
-
-      await api.updateRecord(recordId, updatedRecord);
+      await api.addNote(recordId, noteData);
       setFlashMessage('Notiz erfolgreich hinzugefügt.');
       fetchData();
     } catch (error) {
@@ -238,37 +220,7 @@ export const useKanzleiLogic = () => {
 
   const handleUpdateNote = async (recordId, noteId, noteData) => {
     try {
-      const recordToUpdate = records.find(r => r.id === recordId);
-      if (!recordToUpdate) throw new Error('Akte nicht gefunden');
-
-      const updatedNotizen = recordToUpdate.notizen.map(note => {
-        if (note.id !== noteId) {
-          return note;
-        }
-
-        // Check if the update is only for financial fields
-        const isOnlyFinancialUpdate =
-          Object.keys(noteData).length > 0 &&
-          Object.keys(noteData).every(
-            key => key === 'betrag_soll' || key === 'betrag_haben'
-          );
-
-        const updatedNote = { ...note, ...noteData };
-
-        // Only update the timestamp if it's not a purely financial edit
-        if (!isOnlyFinancialUpdate) {
-          updatedNote.aktualisierungsdatum = new Date().toISOString();
-        }
-
-        return updatedNote;
-      });
-
-      const updatedRecord = {
-        ...recordToUpdate,
-        notizen: updatedNotizen,
-      };
-
-      await api.updateRecord(recordId, updatedRecord);
+      await api.updateNote(recordId, noteId, noteData);
       setFlashMessage('Notiz erfolgreich aktualisiert.');
       fetchData();
     } catch (error) {
@@ -278,17 +230,7 @@ export const useKanzleiLogic = () => {
 
   const handleDeleteNote = async (recordId, noteId) => {
     try {
-      const recordToUpdate = records.find(r => r.id === recordId);
-      if (!recordToUpdate) throw new Error('Akte nicht gefunden');
-
-      const updatedNotizen = recordToUpdate.notizen.filter(note => note.id !== noteId);
-
-      const updatedRecord = {
-        ...recordToUpdate,
-        notizen: updatedNotizen,
-      };
-
-      await api.updateRecord(recordId, updatedRecord);
+      await api.deleteNote(recordId, noteId);
       setFlashMessage('Notiz erfolgreich gelöscht.');
       fetchData();
     } catch (error) {
@@ -459,7 +401,7 @@ export const useKanzleiLogic = () => {
     }
   };
 
-  const nextCaseNumber = generateNewCaseNumber(records.length);
+  const nextCaseNumber = useMemo(() => generateNewCaseNumber(records.length), [records.length]);
 
   const handleRecordSubmit = async (formData) => {
     try {
@@ -474,25 +416,23 @@ export const useKanzleiLogic = () => {
         throw new Error("Cannot submit record without a client (mandantId).");
       }
 
-      const recordData = {
-        mandantId,
+      // Backend expects: aktenzeichen, status, mandanten_id, dokumente_pfad
+      const payloadData = {
+        aktenzeichen: recordId ? (records.find(r => r.id === recordId)?.caseNumber || '') : nextCaseNumber,
         status,
-        gegnerId,
-        schadenDatum: unfallDatum,
-        kennzeichen,
-        mdtKennzeichen,
-        gegnerKennzeichen,
-        sonstigeBeteiligte,
-        beteiligteDritte,
+        mandanten_id: mandantId,
+        dokumente_pfad: '', // optional, leer bei Neuanlage
       };
 
-      // Map before sending to the API
-      let payloadData = { ...recordData };
-      // 1) Map caseNumber -> aktenzeichen (use existing for update, nextCaseNumber for create)
-      payloadData.aktenzeichen = recordId ? (records.find(r => r.id === recordId)?.caseNumber || '') : nextCaseNumber;
-      // 2) Map mandantId -> mandanten_id
-      payloadData.mandanten_id = payloadData.mandantId;
-      
+      // Zusätzliche Felder für spätere Erweiterungen (werden ignoriert, falls Backend sie nicht nutzt)
+      // payloadData.gegnerId = gegnerId;
+      // payloadData.schadenDatum = unfallDatum;
+      // payloadData.kennzeichen = kennzeichen;
+      // payloadData.mdtKennzeichen = mdtKennzeichen;
+      // payloadData.gegnerKennzeichen = gegnerKennzeichen;
+      // payloadData.sonstigeBeteiligte = sonstigeBeteiligte;
+      // payloadData.beteiligteDritte = beteiligteDritte;
+
       // Step 1: Extract single file from form input (if present) and remove it from the record payload
       const extractFirstFileFromFormData = (data) => {
         if (!data || typeof File === 'undefined') return null;
@@ -537,7 +477,7 @@ export const useKanzleiLogic = () => {
         return clean;
       };
 
-      payloadData = stripAttachmentMetaFields(payloadData);
+      // payloadData = stripAttachmentMetaFields(payloadData);
 
       // Deep-clean helper to ensure full JSON-serializability (no File/Blob or file-metadata-like objects)
       const deepCleanSerializable = (value) => {
@@ -596,7 +536,7 @@ export const useKanzleiLogic = () => {
       } else {
         const newRecordRaw = {
             ...payloadData,
-            caseNumber: nextCaseNumber,
+            aktenzeichen: nextCaseNumber,
             dokumente: [],
             notizen: [],
             aufgaben: [],
@@ -621,6 +561,7 @@ export const useKanzleiLogic = () => {
     } catch (error) {
       setFlashMessage(error.message);
       console.error(error);
+      throw error; // Fehler an die aufrufende Komponente weiterleiten
     }
   };
 

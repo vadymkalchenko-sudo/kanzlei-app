@@ -64,11 +64,33 @@ export const resetPassword = (userId, newPassword) => {
 };
 
 // Mock login function for demonstration
-export const login = (username, password) => {
-    const users = getUsers();
-    const user = users.find(u => u.username === username && u.password === password);
-    if (user) {
-        return { success: true, user: { username: user.username, role: user.role } };
+export const login = async (username, password) => {
+    try {
+        const response = await fetch('http://localhost:3001/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            return { success: false, message: errorData.error || 'Login fehlgeschlagen' };
+        }
+
+        const { token, role } = await response.json();
+        sessionStorage.setItem('authToken', token);
+        sessionStorage.setItem('userRole', role);
+
+        return { success: true, user: { username, role } };
+    } catch (error) {
+        return { success: false, message: 'Netzwerkfehler beim Login' };
     }
-    return { success: false, message: 'Ungültiger Benutzername oder Passwort' };
 };
+
+export const logout = () => {
+    sessionStorage.removeItem('authToken');
+    sessionStorage.removeItem('userRole');
+};
+
+export const getToken = () => sessionStorage.getItem('authToken');
+export const getUserRole = () => sessionStorage.getItem('userRole');

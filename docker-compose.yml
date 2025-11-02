@@ -4,12 +4,12 @@ services:
   postgres:
     image: postgres:14-alpine
     container_name: kanzlei_postgres_db
-    env_file:
-      - .env
+    environment:
+      POSTGRES_DB: kanzlei_final
+      POSTGRES_USER: kanzlei_user_final
+      POSTGRES_PASSWORD: super-sicheres-passwort-final
     volumes:
-      - type: bind
-        source: ./Test_DB/postgres_data
-        target: /var/lib/postgresql/data
+      - postgres_final_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     restart: unless-stopped
@@ -30,21 +30,27 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3001:3001"
-    env_file:
-      - .env
+    environment:
+      DB_DATABASE: kanzlei_final
+      DB_USER: kanzlei_user_final
+      DB_PASSWORD: super-sicheres-passwort-final
+      DB_HOST: postgres
+      DB_PORT: 5432
+      JWT_SECRET: jwt-secret
+      ADMIN_INITIAL_PASSWORD: admin
     volumes:
       - type: bind
         source: ./
         target: /app
       - /app/backend/node_modules
       - type: bind
-        source: ./Test_DB/app_data
+        source: /home/vadim/App-Entwicklung/Test_DB_V2/app_data
         target: /app/kanzlei-data
       - type: bind
-        source: ./Test_DB/documents
+        source: /home/vadim/App-Entwicklung/Test_DB_V2/documents
         target: /app/documents
       - type: bind
-        source: ./Test_DB/master_data
+        source: /home/vadim/App-Entwicklung/Test_DB_V2/master_data
         target: /app/master_data
       - type: bind
         source: ./init.sql
@@ -77,3 +83,6 @@ services:
       - "8080:8080"
     depends_on:
       - postgres
+
+volumes:
+  postgres_final_data:

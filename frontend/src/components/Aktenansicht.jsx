@@ -241,9 +241,9 @@ export const Aktenansicht = ({
       {/* Header */}
       <div className="flex justify-between items-start mb-6 pb-4 border-b">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-800">Aktenansicht: {record.caseNumber}</h2>
-          {record.unfallDatum && (
-            <p className="text-lg text-gray-600">Unfalldatum: {formatDate(record.unfallDatum)}</p>
+          <h2 className="text-2xl font-semibold text-gray-800">Aktenansicht: {record.aktenzeichen}</h2>
+          {record.unfall_datum && (
+            <p className="text-lg text-gray-600">Unfalldatum: {formatDate(record.unfall_datum)}</p>
           )}
         </div>
         <div className="flex-grow ml-12">
@@ -316,7 +316,7 @@ export const Aktenansicht = ({
               ) : (
                 <p>N/A</p>
               )}
-              <p>Kennzeichen: {record.gegnerKennzeichen || 'N/A'}</p>
+              <p>Kennzeichen: {record.gegner_kennzeichen || 'N/A'}</p>
             </div>
           </div>
 

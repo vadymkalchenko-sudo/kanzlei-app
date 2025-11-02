@@ -7,10 +7,15 @@ import Stammdatenverwaltung from './components/Stammdatenverwaltung.jsx';
 import Aktenansicht from './components/Aktenansicht.jsx';
 import PersonForm from './components/PersonForm.jsx';
 import AdminPanel from './components/AdminPanel/AdminPanel.jsx';
-import { login } from './services/authService.js';
+import { login, logout } from './services/authService.js';
 
 // Hauptkomponente, die die gesamte Anwendung darstellt
 export const App = () => {
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [userRole, setUserRole] = useState(null);
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+
     const {
         isAppReady,
         mandanten,
@@ -41,7 +46,7 @@ export const App = () => {
         handleImport,
         nextCaseNumber,
         setSearchTerm,
-    } = useKanzleiLogic();
+    } = useKanzleiLogic(isLoggedIn);
 
     const [currentView, setCurrentView] = useState('akten');
     const [initialStammdatenTab, setInitialStammdatenTab] = useState('mandanten');
@@ -57,14 +62,10 @@ export const App = () => {
     const [showDueTodayOnly, setShowDueTodayOnly] = useState(false);
 
     // Auth state
-    const [isLoggedIn, setIsLoggedIn] = useState(true);
-    const [userRole, setUserRole] = useState('admin');
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
-        const result = login(username, password);
+        const result = await login(username, password);
         if (result.success) {
             setIsLoggedIn(true);
             setUserRole(result.user.role);
@@ -73,6 +74,12 @@ export const App = () => {
             setFlashMessage({ type: 'error', message: result.message });
         }
     };
+
+    useEffect(() => {
+        // Beim ersten Laden der App den alten Zustand bereinigen, um Endlosschleifen bei ungültigen Token zu verhindern.
+        // Ein besserer Ansatz wäre, den Token hier zu validieren, aber für den Moment ist das die sicherste Lösung.
+        logout();
+    }, []);
 
     const navigateToStammdaten = (tab = 'mandanten') => {
         setInitialStammdatenTab(tab);
@@ -83,11 +90,13 @@ export const App = () => {
         setFlashMessage(null);
     };
 
-    const handleOpenAkteModal = (akte = null) => {
-        setSelectedItem(akte);
-        if (akte) {
+    const handleOpenAkteModal = (recordId = null) => {
+        if (recordId) {
+            const akte = records.find(r => r.id === recordId);
+            setSelectedItem(akte);
             setCurrentView('akten_detail');
         } else {
+            setSelectedItem(null);
             setIsModalOpen(true);
         }
     };
@@ -367,7 +376,7 @@ export const App = () => {
                     {currentView === 'akten_detail' && (
                         <Aktenansicht
                             record={selectedItem}
-                            mandant={mandanten.find(m => m.id === selectedItem.mandantId)}
+                            mandant={mandanten.find(m => m.id === selectedItem.mandanten_id)}
                             dritteBeteiligte={dritteBeteiligte}
                             onGoBack={handleGoBackToList}
                             onDirectEdit={handleDirectEdit}
