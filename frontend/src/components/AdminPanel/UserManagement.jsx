@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getUsers, addUser, updateUser, deleteUser, resetPassword } from '../../services/authService';
+import { getUsers, addUser, updateUser, deleteUser, resetPassword, getRoles } from '../../services/authService';
 import { Modal } from '../ui/Modal';
 import UserForm from './UserForm';
 
@@ -9,9 +9,9 @@ const UserManagement = ({ setFlashMessage }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [userToEdit, setUserToEdit] = useState(null);
 
-    const fetchUsers = () => {
+    const fetchUsers = async () => {
         try {
-            const userList = getUsers();
+            const userList = await getUsers();
             setUsers(userList);
         } catch (error) {
             setFlashMessage({ type: 'error', message: 'Fehler beim Laden der Benutzer.' });
@@ -34,10 +34,10 @@ const UserManagement = ({ setFlashMessage }) => {
         setIsModalOpen(true);
     };
 
-    const handleDeleteUser = (userId) => {
+    const handleDeleteUser = async (userId) => {
         if (window.confirm('Sind Sie sicher, dass Sie diesen Benutzer löschen möchten?')) {
             try {
-                deleteUser(userId);
+                await deleteUser(userId);
                 fetchUsers();
                 setFlashMessage({ type: 'success', message: 'Benutzer erfolgreich gelöscht.' });
             } catch (error) {
@@ -46,11 +46,11 @@ const UserManagement = ({ setFlashMessage }) => {
         }
     };
 
-    const handleResetPassword = (userId) => {
+    const handleResetPassword = async (userId) => {
         const newPassword = prompt('Bitte geben Sie das neue Passwort ein:');
         if (newPassword) {
             try {
-                resetPassword(userId, newPassword);
+                await resetPassword(userId, newPassword);
                 setFlashMessage({ type: 'success', message: 'Passwort erfolgreich zurückgesetzt.' });
             } catch (error) {
                 setFlashMessage({ type: 'error', message: 'Fehler beim Zurücksetzen des Passworts.' });
@@ -58,13 +58,13 @@ const UserManagement = ({ setFlashMessage }) => {
         }
     };
 
-    const handleFormSubmit = (formData) => {
+    const handleFormSubmit = async (formData) => {
         try {
             if (userToEdit) {
-                updateUser(userToEdit.id, formData);
+                await updateUser(userToEdit.id, formData);
                 setFlashMessage({ type: 'success', message: 'Benutzer erfolgreich aktualisiert.' });
             } else {
-                addUser(formData.username, formData.password, formData.role);
+                await addUser(formData.username, formData.password, formData.role);
                 setFlashMessage({ type: 'success', message: 'Benutzer erfolgreich hinzugefügt.' });
             }
             fetchUsers();
@@ -96,8 +96,6 @@ const UserManagement = ({ setFlashMessage }) => {
                             <th className="px-4 py-2 text-left">ID</th>
                             <th className="px-4 py-2 text-left">Username</th>
                             <th className="px-4 py-2 text-left">Rolle</th>
-                            <th className="px-4 py-2 text-left">Status</th>
-                            <th className="px-4 py-2 text-left">Erstellt am</th>
                             <th className="px-4 py-2 text-left">Aktionen</th>
                         </tr>
                     </thead>
@@ -106,9 +104,7 @@ const UserManagement = ({ setFlashMessage }) => {
                             <tr key={user.id} className="border-b">
                                 <td className="px-4 py-2">{user.id}</td>
                                 <td className="px-4 py-2">{user.username}</td>
-                                <td className="px-4 py-2">{user.role}</td>
-                                <td className="px-4 py-2">{user.status}</td>
-                                <td className="px-4 py-2">{new Date(user.createdAt).toLocaleDateString()}</td>
+                                <td className="px-4 py-2">{user.role_name}</td>
                                 <td className="px-4 py-2">
                                     <button onClick={() => handleEditUser(user)} className="mr-2 text-blue-500 hover:text-blue-700">Bearbeiten</button>
                                     <button onClick={() => handleResetPassword(user.id)} className="mr-2 text-yellow-500 hover:text-yellow-700">Passwort zurücksetzen</button>

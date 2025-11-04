@@ -59,7 +59,7 @@ const initializeDatabase = async () => {
                 id UUID PRIMARY KEY,
                 username VARCHAR(255) UNIQUE NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
-                role VARCHAR(50) NOT NULL
+                role VARCHAR(50) REFERENCES roles(name) DEFAULT 'admin' -- Standardmäßig 'admin' Rolle
             );
         `);
         console.log('Tabelle "users" erstellt oder existiert bereits.');
@@ -186,20 +186,69 @@ const authenticateToken = (req, res, next) => {
 
     if (token == null) return res.sendStatus(401);
 
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    jwt.verify(token, process.env.JWT_SECRET, async (err, user) => {
         if (err) return res.sendStatus(403);
-        req.user = user;
-        next();
+
+        try {
+            // Benutzerdetails und Rollenname abrufen
+            const userResult = await pool.query(
+                'SELECT u.id, u.username, r.name AS role_name FROM users u JOIN roles r ON u.role = r.name WHERE u.id = $1',
+                [user.userId]
+            );
+            if (userResult.rows.length === 0) {
+                return res.sendStatus(403); // Benutzer nicht gefunden oder Rolle nicht zugeordnet
+            }
+            const fullUser = userResult.rows[0];
+
+            // Berechtigungen für die Rolle abrufen
+            const permissionsResult = await pool.query(
+                `SELECT p.name FROM permissions p
+                 JOIN role_permissions rp ON p.id = rp.permission_id
+                 WHERE rp.role_id = (SELECT id FROM roles WHERE name = $1)`,
+                [fullUser.role_name]
+            );
+            const permissions = permissionsResult.rows.map(row => row.name);
+
+            req.user = {
+                userId: fullUser.id,
+                username: fullUser.username,
+                role: fullUser.role_name,
+                permissions: permissions
+            };
+            next();
+        } catch (dbError) {
+            console.error('Fehler beim Abrufen der Benutzerberechtigungen:', dbError);
+            res.sendStatus(500);
+        }
     });
 };
 
-// Router anwenden (jetzt mit Authentifizierung)
-app.use('/api/records', authenticateToken, createRouter(aktenRepo));
-app.use('/api/mandanten', authenticateToken, createRouter(mandantenRepo));
-app.use('/api/dritte-beteiligte', authenticateToken, createRouter(gegnerRepo));
+// Autorisierungs-Middleware
+const authorize = (requiredPermissions) => {
+    return (req, res, next) => {
+        if (!req.user || !req.user.permissions) {
+            return res.sendStatus(401); // Nicht authentifiziert
+        }
+
+        const hasPermission = requiredPermissions.some(permission =>
+            req.user.permissions.includes(permission)
+        );
+
+        if (hasPermission) {
+            next();
+        } else {
+            res.sendStatus(403); // Keine Berechtigung
+        }
+    };
+};
+
+// Router anwenden (jetzt mit Authentifizierung und Autorisierung)
+app.use('/api/records', authenticateToken, authorize(['akten:read']), createRouter(aktenRepo));
+app.use('/api/mandanten', authenticateToken, authorize(['mandanten:read']), createRouter(mandantenRepo));
+app.use('/api/dritte-beteiligte', authenticateToken, authorize(['gegner:read']), createRouter(gegnerRepo));
 
 // --- Spezifische Routen für Notizen ---
-app.post('/api/records/:recordId/notes', authenticateToken, async (req, res) => {
+app.post('/api/records/:recordId/notes', authenticateToken, authorize(['notes:create']), async (req, res) => {
     try {
         const newNote = await aktenRepo.addNote(req.params.recordId, req.body);
         res.status(201).json(newNote);
@@ -209,7 +258,7 @@ app.post('/api/records/:recordId/notes', authenticateToken, async (req, res) => 
     }
 });
 
-app.put('/api/records/:recordId/notes/:noteId', authenticateToken, async (req, res) => {
+app.put('/api/records/:recordId/notes/:noteId', authenticateToken, authorize(['notes:update']), async (req, res) => {
     try {
         const updatedNote = await aktenRepo.updateNote(req.params.noteId, req.body);
         res.json(updatedNote);
@@ -219,7 +268,7 @@ app.put('/api/records/:recordId/notes/:noteId', authenticateToken, async (req, r
     }
 });
 
-app.delete('/api/records/:recordId/notes/:noteId', authenticateToken, async (req, res) => {
+app.delete('/api/records/:recordId/notes/:noteId', authenticateToken, authorize(['notes:delete']), async (req, res) => {
     try {
         await aktenRepo.deleteNote(req.params.noteId);
         res.status(204).send();
@@ -231,7 +280,7 @@ app.delete('/api/records/:recordId/notes/:noteId', authenticateToken, async (req
 
 
 // Datei-Upload-Route
-app.post('/api/records/:recordId/documents', authenticateToken, upload.array('documents'), async (req, res) => {
+app.post('/api/records/:recordId/documents', authenticateToken, authorize(['documents:upload']), upload.array('documents'), async (req, res) => {
     const { recordId } = req.params;
     console.log('[UPLOAD START]', { recordId, filesCount: req.files ? req.files.length : 0 });
     try {
@@ -313,7 +362,7 @@ app.post('/api/records/:recordId/documents', authenticateToken, upload.array('do
 });
 
 // Route zum Abrufen eines Dokuments
-app.get('/api/documents/:documentId', async (req, res) => {
+app.get('/api/documents/:documentId', authenticateToken, authorize(['documents:read']), async (req, res) => {
     try {
         const { documentId } = req.params;
         const document = await aktenRepo.getDocumentById(documentId);
@@ -342,7 +391,7 @@ app.get('/api/documents/:documentId', async (req, res) => {
 });
 
 // Route zum Löschen eines Dokuments
-app.delete('/api/documents/:documentId', async (req, res) => {
+app.delete('/api/documents/:documentId', authenticateToken, authorize(['documents:delete']), async (req, res) => {
     try {
         const { documentId } = req.params;
         const deletedCount = await aktenRepo.removeDocument(documentId);
@@ -385,9 +434,130 @@ app.post('/api/login', async (req, res) => {
         );
 
         res.json({ token, role: user.role });
-
     } catch (err) {
         console.error('Login-Fehler:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
+// Benutzer-Management Routen (nur für admin oder power_user)
+app.get('/api/users', authenticateToken, authorize(['users:manage']), async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT u.id, u.username, r.name as role_name
+            FROM users u
+            JOIN roles r ON u.role = r.name
+            ORDER BY u.username
+        `);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Fehler beim Abrufen der Benutzer:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
+app.post('/api/users', authenticateToken, authorize(['users:manage']), async (req, res) => {
+    try {
+        const { username, password, role } = req.body;
+        if (!username || !password || !role) {
+            return res.status(400).json({ error: 'Benutzername, Passwort und Rolle sind erforderlich' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const userId = crypto.randomUUID();
+
+        await pool.query(
+            'INSERT INTO users (id, username, password_hash, role) VALUES ($1, $2, $3, $4)',
+            [userId, username, hashedPassword, role]
+        );
+
+        res.status(201).json({ id: userId, username, role });
+    } catch (err) {
+        console.error('Fehler beim Erstellen des Benutzers:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
+app.put('/api/users/:id', authenticateToken, authorize(['users:manage']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { username, password, role } = req.body;
+
+        let query = 'UPDATE users SET ';
+        const values = [];
+        let paramIndex = 1;
+
+        if (username !== undefined) {
+            query += `username = $${paramIndex++}, `;
+            values.push(username);
+        }
+
+        if (password !== undefined) {
+            const hashedPassword = await bcrypt.hash(password, 10);
+            query += `password_hash = $${paramIndex++}, `;
+            values.push(hashedPassword);
+        }
+
+        if (role !== undefined) {
+            query += `role = $${paramIndex++}, `;
+            values.push(role);
+        }
+
+        // Entferne das letzte ", " und füge WHERE hinzu
+        query = query.slice(0, -2) + ' WHERE id = $' + paramIndex + ' RETURNING id, username, role';
+        values.push(id);
+
+        const result = await pool.query(query, values);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Benutzer nicht gefunden' });
+        }
+
+        res.json({ message: 'Benutzer erfolgreich aktualisiert' });
+    } catch (err) {
+        console.error('Fehler beim Aktualisieren des Benutzers:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
+app.delete('/api/users/:id', authenticateToken, authorize(['users:manage']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Admin-Benutzer darf nicht gelöscht werden
+        const adminCheck = await pool.query('SELECT * FROM users WHERE id = $1 AND role = $2', [id, 'admin']);
+        if (adminCheck.rows.length > 0) {
+            return res.status(400).json({ error: 'Admin-Benutzer kann nicht gelöscht werden' });
+        }
+
+        const result = await pool.query('DELETE FROM users WHERE id = $1', [id]);
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Benutzer nicht gefunden' });
+        }
+
+        res.json({ message: 'Benutzer erfolgreich gelöscht' });
+    } catch (err) {
+        console.error('Fehler beim Löschen des Benutzers:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
+// Rollen-Management Routen (nur für admin)
+app.get('/api/roles', authenticateToken, authorize(['roles:manage']), async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM roles ORDER BY name');
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Fehler beim Abrufen der Rollen:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
+app.get('/api/permissions', authenticateToken, authorize(['roles:manage']), async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM permissions ORDER BY name');
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Fehler beim Abrufen der Berechtigungen:', err);
         res.status(500).json({ error: 'Interner Serverfehler' });
     }
 });

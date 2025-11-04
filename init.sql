@@ -45,3 +45,97 @@ CREATE TABLE IF NOT EXISTS notizen (
     aktualisierungsdatum TIMESTAMP,
     erledigt BOOLEAN DEFAULT FALSE
 );
+
+-- Erstellung der Tabelle 'roles'
+CREATE TABLE IF NOT EXISTS roles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(50) UNIQUE NOT NULL,
+    description TEXT
+);
+
+-- Erstellung der Tabelle 'permissions'
+CREATE TABLE IF NOT EXISTS permissions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) UNIQUE NOT NULL,
+    description TEXT
+);
+
+-- Erstellung der Tabelle 'role_permissions' (Verknüpfungstabelle)
+CREATE TABLE IF NOT EXISTS role_permissions (
+    role_id UUID REFERENCES roles(id) ON DELETE CASCADE,
+    permission_id UUID REFERENCES permissions(id) ON DELETE CASCADE,
+    PRIMARY KEY (role_id, permission_id)
+);
+
+-- Initialrollen einfügen
+INSERT INTO roles (id, name, description) VALUES
+    ('a0000000-0000-0000-0000-000000000001', 'admin', 'Voller Zugriff auf alle Funktionen und Daten'),
+    ('a0000000-0000-0000-0000-000000000002', 'power_user', 'Erweiterte Zugriffsrechte, z.B. CRUD für Akten, Mandanten, Gegner'),
+    ('a0000000-0000-0000-0000-000000000003', 'user', 'Standard-Zugriffsrechte, z.B. Lesen von Akten, Erstellen von Notizen'),
+    ('a0000000-0000-0000-0000-000000000004', 'extern', 'Eingeschränkter Zugriff, z.B. nur eigene Akten einsehen')
+ON CONFLICT (name) DO NOTHING;
+
+-- Initialberechtigungen einfügen
+INSERT INTO permissions (id, name, description) VALUES
+    ('b0000000-0000-0000-0000-000000000001', 'users:manage', 'Benutzer erstellen, bearbeiten, löschen'),
+    ('b0000000-0000-0000-0000-000000000002', 'roles:manage', 'Rollen und Berechtigungen verwalten'),
+    ('b0000000-0000-0000-0000-000000000003', 'mandanten:read', 'Mandanten lesen'),
+    ('b0000000-0000-0000-0000-000000000004', 'mandanten:create', 'Mandanten erstellen'),
+    ('b0000000-0000-0000-0000-000000000005', 'mandanten:update', 'Mandanten aktualisieren'),
+    ('b0000000-0000-0000-0000-000000000006', 'mandanten:delete', 'Mandanten löschen'),
+    ('b0000000-0000-0000-0000-000000000007', 'akten:read', 'Akten lesen'),
+    ('b0000000-0000-0000-0000-000000000008', 'akten:create', 'Akten erstellen'),
+    ('b0000000-0000-0000-0000-000000000009', 'akten:update', 'Akten aktualisieren'),
+    ('b0000000-0000-0000-0000-000000000010', 'akten:delete', 'Akten löschen'),
+    ('b0000000-0000-0000-0000-000000000011', 'gegner:read', 'Gegner lesen'),
+    ('b0000000-0000-0000-0000-000000000012', 'gegner:create', 'Gegner erstellen'),
+    ('b0000000-0000-0000-0000-000000000013', 'gegner:update', 'Gegner aktualisieren'),
+    ('b0000000-0000-0000-0000-000000000014', 'gegner:delete', 'Gegner löschen'),
+    ('b0000000-0000-0000-0000-000000000015', 'documents:upload', 'Dokumente hochladen'),
+    ('b0000000-0000-0000-0000-000000000016', 'documents:read', 'Dokumente lesen'),
+    ('b0000000-0000-0000-0000-000000000017', 'documents:delete', 'Dokumente löschen'),
+    ('b0000000-0000-0000-0000-000000000018', 'notes:create', 'Notizen erstellen'),
+    ('b0000000-0000-0000-0000-000000000019', 'notes:update', 'Notizen aktualisieren'),
+    ('b0000000-0000-0000-0000-000000000020', 'notes:delete', 'Notizen löschen')
+ON CONFLICT (name) DO NOTHING;
+
+-- Rollen-Berechtigungen zuweisen
+-- Admin-Rolle: Alle Berechtigungen
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT
+    (SELECT id FROM roles WHERE name = 'admin'),
+    id
+FROM permissions
+ON CONFLICT DO NOTHING;
+
+-- Power_User-Rolle: Vollzugriff auf alle Module
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT
+    (SELECT id FROM roles WHERE name = 'power_user'),
+    id
+FROM permissions
+ON CONFLICT DO NOTHING;
+
+-- User-Rolle: Zugriff auf Akten, Mandanten, Gegner mit Einschränkungen
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT
+    (SELECT id FROM roles WHERE name = 'user'),
+    id
+FROM permissions
+WHERE name IN (
+    'mandanten:read', 'mandanten:create', 'mandanten:update',
+    'akten:read', 'akten:create', 'akten:update',
+    'gegner:read', 'gegner:create', 'gegner:update'
+)
+ON CONFLICT DO NOTHING;
+
+-- Extern-Rolle: Nur lesender Zugriff
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT
+    (SELECT id FROM roles WHERE name = 'extern'),
+    id
+FROM permissions
+WHERE name IN (
+    'mandanten:read', 'akten:read', 'gegner:read', 'documents:read'
+)
+ON CONFLICT DO NOTHING;

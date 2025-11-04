@@ -1,21 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { ROLES } from '../../services/authService';
+import { getRoles } from '../../services/authService';
 
 const UserForm = ({ user, onSubmit, onCancel, title }) => {
     const [formData, setFormData] = useState({
         username: '',
         password: '',
         role: 'user',
-        status: 'active',
     });
+    const [roles, setRoles] = useState([]);
 
     useEffect(() => {
+        const loadRoles = async () => {
+            try {
+                const rolesData = await getRoles();
+                setRoles(rolesData);
+            } catch (error) {
+                console.error('Fehler beim Laden der Rollen:', error);
+            }
+        };
+
+        loadRoles();
+
         if (user) {
             setFormData({
                 username: user.username,
                 password: '', // Password should not be pre-filled
-                role: user.role,
-                status: user.status,
+                role: user.role || 'user',
             });
         }
     }, [user]);
@@ -68,22 +78,9 @@ const UserForm = ({ user, onSubmit, onCancel, title }) => {
                     onChange={handleChange}
                     className="w-full px-3 py-2 border rounded"
                 >
-                    {ROLES.map(role => (
-                        <option key={role} value={role}>{role}</option>
+                    {roles.map(role => (
+                        <option key={role.id} value={role.name}>{role.name}</option>
                     ))}
-                </select>
-            </div>
-             <div>
-                <label className="block mb-1 font-semibold" htmlFor="status">Status</label>
-                <select
-                    id="status"
-                    name="status"
-                    value={formData.status}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded"
-                >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
                 </select>
             </div>
             <div className="flex justify-end space-x-4">
