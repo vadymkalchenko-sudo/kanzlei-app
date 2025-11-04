@@ -11,7 +11,7 @@ import { login, logout, getToken, getUserRole } from './services/authService.js'
 
 // Hauptkomponente, die die gesamte Anwendung darstellt
 export const App = () => {
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [isLoggedIn, setIsLoggedIn] = useState(!!getToken());
     const [userRole, setUserRole] = useState(null);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -20,6 +20,18 @@ export const App = () => {
         logout();
         setIsLoggedIn(false);
         setUserRole(null);
+    }, []);
+
+    useEffect(() => {
+        const token = getToken();
+        const role = getUserRole();
+        if (token && role) {
+            setIsLoggedIn(true);
+            setUserRole(role);
+        } else {
+            setIsLoggedIn(false);
+            setUserRole(null);
+        }
     }, []);
 
     const {

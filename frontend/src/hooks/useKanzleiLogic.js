@@ -273,6 +273,7 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
         inhalt: aufgabeData.details || '',
         typ: 'Aufgabe',
         erledigt: false,
+        erstellungsdatum: aufgabeData.datum,
       };
       await api.addNote(recordId, noteData);
       setFlashMessage('Aufgabe erfolgreich hinzugefügt.');
@@ -286,8 +287,9 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
     try {
       const noteData = {
         titel: aufgabeData.titel,
-        inhalt: '',
+        inhalt: aufgabeData.details || '',
         typ: 'Aufgabe',
+        erstellungsdatum: aufgabeData.datum,
       };
       await api.updateNote(recordId, aufgabeId, noteData);
       setFlashMessage('Aufgabe erfolgreich aktualisiert.');

@@ -176,35 +176,34 @@ export const Aktenansicht = ({
 
   const handleOpenDocument = async (documentId) => {
     try {
-      // Finde das Dokument zuerst im lokalen State
-      const localDoc = record.dokumente.find(d => d.id === documentId);
-      if (!localDoc) throw new Error('Dokument nicht im lokalen State gefunden.');
-
-      let docData = localDoc;
-      // Wenn die Base64-Daten fehlen, lade sie explizit nach
-      if (!docData.data_b64) {
-        docData = await api.getDocument(documentId);
+      const doc = await api.getDocument(documentId);
+      if (!doc || !doc.data_b64) {
+        throw new Error('Dokumentendaten unvollständig.');
       }
 
-      if (!docData || !docData.data_b64) {
-        throw new Error('Dokumentendaten konnten nicht geladen werden.');
-      }
-
-      const byteCharacters = atob(docData.data_b64);
+      const byteCharacters = atob(doc.data_b64);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
         byteNumbers[i] = byteCharacters.charCodeAt(i);
       }
       const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: docData.mimetype });
+      const blob = new Blob([byteArray], { type: doc.mimetype });
       
       const blobUrl = URL.createObjectURL(blob);
-      window.open(blobUrl, '_blank');
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      
+      // Erzeuge ein temporäres Link-Element, um den Download mit korrektem Namen zu erzwingen
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = doc.dateiname; // Hier wird der korrekte Dateiname gesetzt
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      URL.revokeObjectURL(blobUrl);
 
     } catch (error) {
-      console.error('Fehler beim Öffnen des Dokuments:', error);
-      alert('Fehler beim Öffnen des Dokuments.');
+      console.error('Fehler beim Öffnen/Herunterladen des Dokuments:', error);
+      alert('Fehler beim Herunterladen des Dokuments.');
     }
   };
 

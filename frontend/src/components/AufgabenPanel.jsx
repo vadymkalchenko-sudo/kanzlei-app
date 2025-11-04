@@ -51,10 +51,10 @@ const AufgabenPanel = ({
         if (!aufgaben) return { active: [], history: [] };
         const active = aufgaben
             .filter(f => !f.erledigt)
-            .sort((a, b) => new Date(a.datum) - new Date(b.datum));
+            .sort((a, b) => new Date(a.faelligkeitsdatum) - new Date(b.faelligkeitsdatum));
         const history = aufgaben
             .filter(f => f.erledigt)
-            .sort((a, b) => new Date(b.datum) - new Date(a.datum));
+            .sort((a, b) => new Date(b.faelligkeitsdatum) - new Date(a.faelligkeitsdatum));
         return { active, history };
     }, [aufgaben]);
 
@@ -75,8 +75,8 @@ const AufgabenPanel = ({
                     )}
                     <div className="flex-grow">
                         <p className="font-semibold text-gray-800">{aufgabe.titel || aufgabe.beschreibung}</p>
-                        <p className="text-sm text-gray-600">{formatDate(aufgabe.erstellungsdatum)}</p>
-                        {aufgabe.details && <p className="text-sm text-gray-500 mt-1 whitespace-pre-wrap">{aufgabe.details}</p>}
+                        <p className="text-sm text-gray-600">Fällig am: {formatDate(aufgabe.faelligkeitsdatum)}</p>
+                        {aufgabe.inhalt && <p className="text-sm text-gray-500 mt-1 whitespace-pre-wrap">{aufgabe.inhalt}</p>}
                     </div>
                 </div>
             </div>

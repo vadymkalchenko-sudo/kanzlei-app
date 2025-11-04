@@ -52,7 +52,9 @@ const findById = async (id) => {
     if (akteResult.rows.length === 0) return null;
     const akte = akteResult.rows[0];
     const notizenResult = await pool.query('SELECT * FROM notizen WHERE akte_id = $1', [id]);
+    const dokumenteResult = await pool.query('SELECT * FROM dokumente WHERE akte_id = $1', [id]);
     akte.notizen = notizenResult.rows;
+    akte.dokumente = dokumenteResult.rows;
     return akte;
 };
 
@@ -201,26 +203,27 @@ module.exports = {
     getDocumentById,
     removeDocument,
     addNote: async (akteId, noteData) => {
-        const { titel, inhalt, typ, betrag_soll, betrag_haben, autor } = noteData;
+        const { titel, inhalt, typ, betrag_soll, betrag_haben, autor, datum } = noteData;
         const id = crypto.randomUUID();
         const query = `
-            INSERT INTO notizen (id, akte_id, titel, inhalt, typ, betrag_soll, betrag_haben, autor)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            INSERT INTO notizen (id, akte_id, titel, inhalt, typ, betrag_soll, betrag_haben, autor, erstellungsdatum)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, ${datum ? '$9' : 'CURRENT_TIMESTAMP'})
             RETURNING *
         `;
         const values = [id, akteId, titel, inhalt, typ, betrag_soll || 0, betrag_haben || 0, autor || 'System'];
+        if (datum) values.push(datum);
         const result = await pool.query(query, values);
         return result.rows[0];
     },
     updateNote: async (noteId, noteData) => {
-        const { titel, inhalt, typ, betrag_soll, betrag_haben, erledigt } = noteData;
+        const { titel, inhalt, typ, betrag_soll, betrag_haben, erledigt, datum } = noteData;
         const query = `
             UPDATE notizen
-            SET titel = $1, inhalt = $2, typ = $3, betrag_soll = $4, betrag_haben = $5, erledigt = $6, aktualisierungsdatum = CURRENT_TIMESTAMP
+            SET titel = $1, inhalt = $2, typ = $3, betrag_soll = $4, betrag_haben = $5, erledigt = $6, aktualisierungsdatum = CURRENT_TIMESTAMP, erstellungsdatum = COALESCE($8, erstellungsdatum)
             WHERE id = $7
             RETURNING *
         `;
-        const values = [titel, inhalt, typ, betrag_soll, betrag_haben, erledigt, noteId];
+        const values = [titel, inhalt, typ, betrag_soll, betrag_haben, erledigt, noteId, datum];
         const result = await pool.query(query, values);
         return result.rows[0];
     },

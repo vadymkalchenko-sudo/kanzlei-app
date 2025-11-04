@@ -9,8 +9,8 @@ const AufgabenForm = ({ aufgabe, onSubmit, onCancel }) => {
   useEffect(() => {
     if (aufgabe) {
       setTitel(aufgabe.titel || '');
-      setDatum(aufgabe.datum ? aufgabe.datum.split('T')[0] : '');
-      setDetails(aufgabe.details || '');
+      setDatum(aufgabe.faelligkeitsdatum ? aufgabe.faelligkeitsdatum.split('T')[0] : '');
+      setDetails(aufgabe.inhalt || '');
     } else {
       setTitel('');
       setDetails('');
