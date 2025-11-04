@@ -45,8 +45,9 @@ const initializeDatabase = async () => {
         const initSql = fs.readFileSync(initSqlPath, 'utf-8');
         
         // Tabellen zwangsweise löschen für einen sauberen Start
-        await client.query('DROP TABLE IF EXISTS dokumente, akten, gegner, mandanten, users CASCADE;');
-        console.log('Alte Tabellen gelöscht.');
+        // Das Löschen der Tabellen wurde entfernt, um die Datenpersistenz gemäß DR-Fähigkeit zu gewährleisten.
+        // await client.query('DROP TABLE IF EXISTS dokumente, akten, gegner, mandanten, users CASCADE;');
+        // console.log('Alte Tabellen gelöscht.');
 
         // Führe die SQL-Befehle aus der Datei aus
         await client.query(initSql);
@@ -177,7 +178,11 @@ const createRouter = (repo) => {
 // Authentifizierungs-Middleware
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    let token = authHeader && authHeader.split(' ')[1];
+
+    if (!token && req.query.token) {
+        token = req.query.token;
+    }
 
     if (token == null) return res.sendStatus(401);
 
@@ -269,11 +274,11 @@ app.post('/api/records/:recordId/documents', authenticateToken, upload.array('do
                 const targetDir = path.join('/app/documents', aktenzeichen);
                 
                 // Sicherstellen, dass das Verzeichnis existiert
-                await fs.mkdir(targetDir, { recursive: true });
+                await fs.promises.mkdir(targetDir, { recursive: true });
                 
                 // Datei speichern
                 const targetPath = path.join(targetDir, file.originalname);
-                await fs.writeFile(targetPath, file.buffer);
+                await fs.promises.writeFile(targetPath, file.buffer);
                 console.log('[UPLOAD DATEI GESPEICHERT]', { path: targetPath });
                 
                 // Dokument in DB eentragen (mit relativem Pfad)
@@ -317,31 +322,18 @@ app.get('/api/documents/:documentId', async (req, res) => {
             return res.status(404).json({ error: 'Dokument nicht gefunden' });
         }
         
-        // Datei vom Dateisystem laden und streamen
+        // Datei als Base64-String senden, damit das Frontend sie verarbeiten kann
         const filePath = path.join('/app/documents', document.pfad);
-        console.log('[DOWNLOAD FILE]', { path: filePath });
-        
-        // Überprüfen, ob die Datei existiert
         try {
-            await fs.access(filePath);
-            
-            // Datei streamen
-            res.setHeader('Content-Disposition', `inline; filename="${document.dateiname}"`);
-            res.setHeader('Content-Type', 'application/octet-stream');
-            const fileStream = fs.createReadStream(filePath);
-            fileStream.pipe(res);
-            
-            fileStream.on('error', (err) => {
-                console.error('Fehler beim Streamen der Datei:', err);
-                res.status(500).json({ error: 'Fehler beim Laden der Datei' });
-            });
-            
-            fileStream.on('end', () => {
-                console.log('[DOWNLOAD COMPLETE]', { documentId });
+            const fileBuffer = await fs.promises.readFile(filePath);
+            const base64Data = fileBuffer.toString('base64');
+            res.json({
+                ...document,
+                data_b64: base64Data,
             });
         } catch (err) {
-            console.error('Datei nicht gefunden:', filePath);
-            res.status(404).json({ error: 'Datei nicht gefunden' });
+            console.error('Datei nicht gefunden oder Lesefehler:', filePath, err);
+            res.status(404).json({ error: 'Physische Datei nicht gefunden' });
         }
     } catch (error) {
         console.error('Fehler beim Abrufen des Dokuments:', error);

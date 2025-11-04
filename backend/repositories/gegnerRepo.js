@@ -47,7 +47,7 @@ const findAll = async () => {
         for (const gegner of result.rows) {
             if (gegner.stammdaten_pfad) {
                 try {
-                    const jsonData = await readJsonFile(path.join('/app/master_data', gegner.stammdaten_pfad));
+                    const jsonData = await readJsonFile(path.join(__dirname, '../master_data', gegner.stammdaten_pfad));
                     gegnerWithDetails.push({ ...gegner, ...jsonData });
                 } catch (error) {
                     console.error(`Fehler beim Lesen der Gegner-Datei ${gegner.stammdaten_pfad}:`, error);
@@ -75,7 +75,7 @@ const findById = async (id) => {
         // JSON-Datei lesen und Daten kombinieren
         if (gegner.stammdaten_pfad) {
             try {
-                const jsonData = await readJsonFile(path.join('/app/master_data', gegner.stammdaten_pfad));
+                const jsonData = await readJsonFile(path.join(__dirname, '../master_data', gegner.stammdaten_pfad));
                 return { ...gegner, ...jsonData };
             } catch (error) {
                 console.error(`Fehler beim Lesen der Gegner-Datei ${gegner.stammdaten_pfad}:`, error);
@@ -101,7 +101,7 @@ const create = async (body) => {
 
         // JSON-Datei schreiben
         const jsonFilePath = `gegner/${id}.json`;
-        const fullPath = path.join('/app/master_data', jsonFilePath);
+        const fullPath = path.join(__dirname, '../master_data', jsonFilePath);
         await writeJsonFile(fullPath, stammdaten);
         
         // Pfad in DB speichern
@@ -139,7 +139,7 @@ const update = async (id, body) => {
         if (!jsonFilePath) {
             jsonFilePath = `gegner/${id}.json`;
         }
-        const fullPath = path.join('/app/master_data', jsonFilePath);
+        const fullPath = path.join(__dirname, '../master_data', jsonFilePath);
         await writeJsonFile(fullPath, stammdaten);
         
         // DB aktualisieren
@@ -177,7 +177,7 @@ const remove = async (id) => {
         // JSON-Datei löschen, falls vorhanden
         if (existingGegner.stammdaten_pfad) {
             try {
-                const fullPath = path.join('/app/master_data', existingGegner.stammdaten_pfad);
+                const fullPath = path.join(__dirname, '../master_data', existingGegner.stammdaten_pfad);
                 await fs.unlink(fullPath);
                 console.log(`JSON-Datei gelöscht: ${fullPath}`);
             } catch (error) {

@@ -1,109 +1,140 @@
-const fetch = require('node-fetch');
+const http = require('http');
 
-const API_BASE_URL = 'http://backend:3001/api';
+const performRequest = (options, postData = null) => {
+  return new Promise((resolve, reject) => {
+    const req = http.request(options, (res) => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => {
+        body += chunk;
+      });
+      res.on('end', () => {
+        resolve({ statusCode: res.statusCode, body: JSON.parse(body) });
+      });
+    });
 
-async function runTest() {
-    console.log('Starte API-Test...');
-    let token = null;
+    req.on('error', (e) => {
+      reject(e);
+    });
 
-    try {
-        // 0. Einloggen
-        console.log('\n--- Logge ein ---');
-        const loginResponse = await fetch(`${API_BASE_URL}/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: 'admin', password: 'admin' })
-        });
-        if (!loginResponse.ok) {
-            throw new Error('Login fehlgeschlagen');
-        }
-        const { token: authToken } = await loginResponse.json();
-        token = authToken;
-        console.log('Login erfolgreich, Token erhalten.');
-
-        const authHeader = { 'Authorization': `Bearer ${token}` };
-
-        // 1. Mandant erstellen
-        console.log('\n--- Erstelle Mandant ---');
-        const mandantData = {
-            vorname: 'Max',
-            nachname: 'Mustermann',
-            strasse: 'Musterstraße 1',
-            plz: '12345',
-            stadt: 'Musterstadt'
-        };
-        const createMandantResponse = await fetch(`${API_BASE_URL}/mandanten`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...authHeader },
-            body: JSON.stringify(mandantData)
-        });
-
-        if (!createMandantResponse.ok) {
-            const error = await createMandantResponse.json();
-            throw new Error(`Fehler beim Erstellen des Mandanten: ${error.message}`);
-        }
-        const createdMandant = await createMandantResponse.json();
-        console.log('Mandant erfolgreich erstellt:', createdMandant);
-
-        // 2. Akte erstellen
-        console.log('\n--- Erstelle Akte ---');
-        const akteData = {
-            aktenzeichen: `AZ-${Date.now()}`,
-            mandanten_id: createdMandant.id
-        };
-        const createAkteResponse = await fetch(`${API_BASE_URL}/records`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...authHeader },
-            body: JSON.stringify(akteData)
-        });
-        if (!createAkteResponse.ok) {
-            const error = await createAkteResponse.json();
-            throw new Error(`Fehler beim Erstellen der Akte: ${error.message}`);
-        }
-        const createdAkte = await createAkteResponse.json();
-        console.log('Akte erfolgreich erstellt:', createdAkte);
-
-
-        // 3. Drittbeteiligten erstellen
-        console.log('\n--- Erstelle Drittbeteiligten ---');
-        const dritteData = {
-            name: 'Versicherung AG',
-            vorname: 'Kontakt',
-            nachname: 'Person'
-        };
-        const createDritteResponse = await fetch(`${API_BASE_URL}/dritte-beteiligte`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...authHeader },
-            body: JSON.stringify(dritteData)
-        });
-        if (!createDritteResponse.ok) {
-            const error = await createDritteResponse.json();
-            throw new Error(`Fehler beim Erstellen des Drittbeteiligten: ${error.message}`);
-        }
-        const createdDritte = await createDritteResponse.json();
-        console.log('Drittbeteiligter erfolgreich erstellt:', createdDritte);
-
-
-        // 4. Daten abrufen und verifizieren
-        console.log('\n--- Verifiziere Daten ---');
-        const getMandantenResponse = await fetch(`${API_BASE_URL}/mandanten`, { headers: authHeader });
-        const mandanten = await getMandantenResponse.json();
-        console.log(`Abgerufene Mandanten (${mandanten.length}):`, mandanten.find(m => m.id === createdMandant.id));
-
-        const getAktenResponse = await fetch(`${API_BASE_URL}/records`, { headers: authHeader });
-        const akten = await getAktenResponse.json();
-        console.log(`Abgerufene Akten (${akten.length}):`, akten.find(a => a.id === createdAkte.id));
-
-        const getDritteResponse = await fetch(`${API_BASE_URL}/dritte-beteiligte`, { headers: authHeader });
-        const dritte = await getDritteResponse.json();
-        console.log(`Abgerufene Drittbeteiligte (${dritte.length}):`, dritte.find(d => d.id === createdDritte.id));
-
-
-        console.log('\nAPI-Test erfolgreich abgeschlossen!');
-
-    } catch (error) {
-        console.error('\nAPI-Test fehlgeschlagen:', error.message);
+    if (postData) {
+      req.write(postData);
     }
-}
+    req.end();
+  });
+};
 
-runTest();
+const login = async () => {
+  const postData = JSON.stringify({ username: 'admin', password: 'admin' });
+  const options = {
+    hostname: 'localhost',
+    port: 3001,
+    path: '/api/login',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(postData),
+    },
+  };
+  console.log('1. Führe Login aus...');
+  const { statusCode, body } = await performRequest(options, postData);
+  if (statusCode !== 200) {
+    throw new Error(`Login fehlgeschlagen mit Status ${statusCode}`);
+  }
+  console.log('   -> Login erfolgreich. Token erhalten.');
+  return body.token;
+};
+
+const createMandant = async (token) => {
+  const postData = JSON.stringify({
+    name: "Max Mustermann",
+    status: "aktiv",
+    email: "max.mustermann@example.com",
+    strasse: "Musterstraße 1",
+    stadt: "Musterstadt"
+  });
+  const options = {
+    hostname: 'localhost',
+    port: 3001,
+    path: '/api/mandanten',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'Content-Length': Buffer.byteLength(postData),
+    },
+  };
+  console.log('2. Erstelle neuen Mandanten...');
+  const { statusCode, body } = await performRequest(options, postData);
+    if (statusCode !== 201) {
+    throw new Error(`Mandantenerstellung fehlgeschlagen mit Status ${statusCode}`);
+  }
+  console.log(`   -> Mandant erfolgreich erstellt mit ID: ${body.id}`);
+  return body.id;
+};
+
+const createAkte = async (token, mandantId) => {
+    const postData = JSON.stringify({
+    aktenzeichen: `AZ-${Date.now()}`,
+    status: 'offen',
+    mandanten_id: mandantId,
+    beschreibung: 'Testakte für den Funktionstest'
+  });
+    const options = {
+    hostname: 'localhost',
+    port: 3001,
+    path: '/api/records',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'Content-Length': Buffer.byteLength(postData),
+    },
+  };
+  console.log('3. Erstelle neue Akte...');
+  const { statusCode, body } = await performRequest(options, postData);
+    if (statusCode !== 201) {
+    throw new Error(`Aktenerstellung fehlgeschlagen mit Status ${statusCode}`);
+  }
+  console.log(`   -> Akte erfolgreich erstellt mit ID: ${body.id}`);
+  return body.id;
+};
+
+const createNotiz = async (token, akteId) => {
+    const postData = JSON.stringify({
+    titel: 'Wichtige Notiz',
+    inhalt: 'Dies ist eine Testnotiz, die während des Funktionstests erstellt wurde.'
+  });
+    const options = {
+    hostname: 'localhost',
+    port: 3001,
+    path: `/api/records/${akteId}/notes`,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'Content-Length': Buffer.byteLength(postData),
+    },
+  };
+  console.log('4. Füge Notiz zur Akte hinzu...');
+  const { statusCode, body } = await performRequest(options, postData);
+    if (statusCode !== 201) {
+    throw new Error(`Notizerstellung fehlgeschlagen mit Status ${statusCode}`);
+  }
+  console.log(`   -> Notiz erfolgreich erstellt.`);
+};
+
+
+const runTests = async () => {
+  try {
+    const token = await login();
+    const mandantId = await createMandant(token);
+    const akteId = await createAkte(token, mandantId);
+    await createNotiz(token, akteId);
+    console.log('\nAlle Funktionstests erfolgreich abgeschlossen!');
+  } catch (error) {
+    console.error('\nFehler während der Funktionstests:', error.message);
+  }
+};
+
+runTests();

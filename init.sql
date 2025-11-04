@@ -31,3 +31,17 @@ CREATE TABLE IF NOT EXISTS dokumente (
     pfad TEXT NOT NULL,
     hochgeladen_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+-- Erstellung der Tabelle 'notizen'
+CREATE TABLE IF NOT EXISTS notizen (
+    id UUID PRIMARY KEY,
+    akte_id VARCHAR(255),
+    titel VARCHAR(255),
+    inhalt TEXT,
+    typ VARCHAR(50),
+    betrag_soll NUMERIC,
+    betrag_haben NUMERIC,
+    autor VARCHAR(255),
+    erstellungsdatum TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    aktualisierungsdatum TIMESTAMP,
+    erledigt BOOLEAN DEFAULT FALSE
+);

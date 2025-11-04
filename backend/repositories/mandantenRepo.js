@@ -47,7 +47,7 @@ const findAll = async () => {
         for (const mandant of result.rows) {
             if (mandant.stammdaten_pfad) {
                 try {
-                    const jsonData = await readJsonFile(path.join('/app/master_data', mandant.stammdaten_pfad));
+                    const jsonData = await readJsonFile(path.join(__dirname, '../master_data', mandant.stammdaten_pfad));
                     mandantenWithDetails.push({ ...mandant, ...jsonData });
                 } catch (error) {
                     console.error(`Fehler beim Lesen der Mandanten-Datei ${mandant.stammdaten_pfad}:`, error);
@@ -75,7 +75,7 @@ const findById = async (id) => {
         // JSON-Datei lesen und Daten kombinieren
         if (mandant.stammdaten_pfad) {
             try {
-                const jsonData = await readJsonFile(path.join('/app/master_data', mandant.stammdaten_pfad));
+                const jsonData = await readJsonFile(path.join(__dirname, '../master_data', mandant.stammdaten_pfad));
                 return { ...mandant, ...jsonData };
             } catch (error) {
                 console.error(`Fehler beim Lesen der Mandanten-Datei ${mandant.stammdaten_pfad}:`, error);
@@ -104,7 +104,7 @@ const create = async (mandantData) => {
         
         // JSON-Datei schreiben
         const jsonFilePath = `mandanten/${id}.json`;
-        const fullPath = path.join('/app/master_data', jsonFilePath);
+        const fullPath = path.join(__dirname, '../master_data', jsonFilePath);
         await writeJsonFile(fullPath, stammdaten_json);
         
         // Pfad in DB speichern
@@ -142,7 +142,7 @@ const update = async (id, body) => {
         if (!jsonFilePath) {
             jsonFilePath = `mandanten/${id}.json`;
         }
-        const fullPath = path.join('/app/master_data', jsonFilePath);
+        const fullPath = path.join(__dirname, '../master_data', jsonFilePath);
         await writeJsonFile(fullPath, stammdaten);
         
         // DB aktualisieren
@@ -180,7 +180,7 @@ const remove = async (id) => {
         // JSON-Datei löschen, falls vorhanden
         if (existingMandant.stammdaten_pfad) {
             try {
-                const fullPath = path.join('/app/master_data', existingMandant.stammdaten_pfad);
+                const fullPath = path.join(__dirname, '../master_data', existingMandant.stammdaten_pfad);
                 await fs.unlink(fullPath);
                 console.log(`JSON-Datei gelöscht: ${fullPath}`);
             } catch (error) {

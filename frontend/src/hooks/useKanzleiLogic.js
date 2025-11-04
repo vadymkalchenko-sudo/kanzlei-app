@@ -13,7 +13,7 @@ const generateNewCaseNumber = (totalRecords) => {
  * Ein benutzerdefinierter Hook, der die gesamte Geschäftslogik der Anwendung kapselt.
  * Er interagiert mit der API-Schicht, um Daten zu verwalten.
  */
-export const useKanzleiLogic = (isLoggedIn) => {
+export const useKanzleiLogic = (isLoggedIn, onLogout) => {
   const [isAppReady, setIsAppReady] = useState(false);
   const [records, setRecords] = useState([]);
   const [mandanten, setMandanten] = useState([]);
@@ -51,11 +51,15 @@ export const useKanzleiLogic = (isLoggedIn) => {
       console.log("--- [FETCH END] ---");
 
     } catch (error) {
-      if (error.name !== 'AbortError') {
-        console.error("[FETCH ERROR]", error);
-        setFlashMessage(`Fehler beim Laden der Daten: ${error.message}`);
-      }
-    } finally {
+     if (error.name !== 'AbortError') {
+       if (error.status === 401 || error.status === 403) {
+         onLogout();
+       } else {
+         console.error("[FETCH ERROR]", error);
+         setFlashMessage(`Fehler beim Laden der Daten: ${error.message}`);
+       }
+     }
+   } finally {
       setIsAppReady(true);
     }
   }, []);
@@ -264,109 +268,66 @@ export const useKanzleiLogic = (isLoggedIn) => {
 
   const handleAddAufgabe = async (recordId, aufgabeData) => {
     try {
-        const recordToUpdate = records.find(r => r.id === recordId);
-        if (!recordToUpdate) throw new Error('Akte nicht gefunden');
-
-        const newAufgabe = {
-            id: `aufgabe_${new Date().getTime()}`,
-            ...aufgabeData,
-            erledigt: false,
-        };
-
-        const updatedRecord = {
-            ...recordToUpdate,
-            aufgaben: [...(recordToUpdate.aufgaben || []), newAufgabe],
-        };
-
-        await api.updateRecord(recordId, updatedRecord);
-        setFlashMessage('Aufgabe erfolgreich hinzugefügt.');
-        fetchData();
+      const noteData = {
+        titel: aufgabeData.titel,
+        inhalt: aufgabeData.details || '',
+        typ: 'Aufgabe',
+        erledigt: false,
+      };
+      await api.addNote(recordId, noteData);
+      setFlashMessage('Aufgabe erfolgreich hinzugefügt.');
+      fetchData();
     } catch (error) {
-        setFlashMessage(`Fehler beim Hinzufügen der Aufgabe: ${error.message}`);
+      setFlashMessage(`Fehler beim Hinzufügen der Aufgabe: ${error.message}`);
     }
   };
 
   const handleUpdateAufgabe = async (recordId, aufgabeId, aufgabeData) => {
     try {
-        const recordToUpdate = records.find(r => r.id === recordId);
-        if (!recordToUpdate) throw new Error('Akte nicht gefunden');
-
-        const updatedAufgaben = recordToUpdate.aufgaben.map(aufgabe =>
-            aufgabe.id === aufgabeId ? { ...aufgabe, ...aufgabeData } : aufgabe
-        );
-
-        const updatedRecord = {
-            ...recordToUpdate,
-            aufgaben: updatedAufgaben,
-        };
-
-        await api.updateRecord(recordId, updatedRecord);
-        setFlashMessage('Aufgabe erfolgreich aktualisiert.');
-        fetchData();
+      const noteData = {
+        titel: aufgabeData.titel,
+        inhalt: '',
+        typ: 'Aufgabe',
+      };
+      await api.updateNote(recordId, aufgabeId, noteData);
+      setFlashMessage('Aufgabe erfolgreich aktualisiert.');
+      fetchData();
     } catch (error) {
-        setFlashMessage(`Fehler beim Aktualisieren der Aufgabe: ${error.message}`);
+      setFlashMessage(`Fehler beim Aktualisieren der Aufgabe: ${error.message}`);
     }
   };
 
   const handleDeleteAufgabe = async (recordId, aufgabeId) => {
     try {
-        const recordToUpdate = records.find(r => r.id === recordId);
-        if (!recordToUpdate) throw new Error('Akte nicht gefunden');
-
-        const updatedAufgaben = recordToUpdate.aufgaben.filter(aufgabe => aufgabe.id !== aufgabeId);
-
-        const updatedRecord = {
-            ...recordToUpdate,
-            aufgaben: updatedAufgaben,
-        };
-
-        await api.updateRecord(recordId, updatedRecord);
-        setFlashMessage('Aufgabe erfolgreich gelöscht.');
-        fetchData();
+      await api.deleteNote(recordId, aufgabeId);
+      setFlashMessage('Aufgabe erfolgreich gelöscht.');
+      fetchData();
     } catch (error) {
-        setFlashMessage(`Fehler beim Löschen der Aufgabe: ${error.message}`);
+      setFlashMessage(`Fehler beim Löschen der Aufgabe: ${error.message}`);
     }
   };
 
   const handleToggleAufgabeErledigt = async (recordId, aufgabeId) => {
     try {
-        const recordToUpdate = records.find(r => r.id === recordId);
-        if (!recordToUpdate) throw new Error('Akte nicht gefunden');
+      const record = records.find(r => r.id === recordId);
+      const note = record?.notizen.find(n => n.id === aufgabeId);
+      if (!note) throw new Error('Aufgabe nicht gefunden');
 
-        const updatedAufgaben = recordToUpdate.aufgaben.map(aufgabe =>
-            aufgabe.id === aufgabeId ? { ...aufgabe, erledigt: !aufgabe.erledigt } : aufgabe
-        );
-
-        const updatedRecord = {
-            ...recordToUpdate,
-            aufgaben: updatedAufgaben,
-        };
-
-        await api.updateRecord(recordId, updatedRecord);
-        setFlashMessage('Aufgaben-Status erfolgreich geändert.');
-        fetchData();
+      const updatedNote = { ...note, erledigt: !note.erledigt };
+      
+      await api.updateNote(recordId, aufgabeId, updatedNote);
+      setFlashMessage('Aufgaben-Status erfolgreich geändert.');
+      fetchData();
     } catch (error) {
-        setFlashMessage(`Fehler beim Ändern des Aufgaben-Status: ${error.message}`);
+      setFlashMessage(`Fehler beim Ändern des Aufgaben-Status: ${error.message}`);
     }
   };
 
   const handleDeleteDocument = async (recordId, documentId) => {
     try {
-      const recordToUpdate = records.find(r => r.id === recordId);
-      if (!recordToUpdate) {
-        throw new Error('Akte nicht gefunden');
-      }
-
-      const updatedDokumente = recordToUpdate.dokumente.filter(d => d.id !== documentId);
-
-      const updatedRecord = {
-        ...recordToUpdate,
-        dokumente: updatedDokumente,
-      };
-
-      await api.updateRecord(recordId, updatedRecord);
+      await api.deleteDocument(documentId); // Korrekte API-Funktion aufrufen
       setFlashMessage('Dokument erfolgreich gelöscht.');
-      fetchData();
+      fetchData(); // Daten neu laden, um die UI zu aktualisieren
     } catch (error) {
       setFlashMessage(`Fehler beim Löschen des Dokuments: ${error.message}`);
     }

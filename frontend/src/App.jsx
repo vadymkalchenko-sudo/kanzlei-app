@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useKanzleiLogic } from './hooks/useKanzleiLogic.js';
 import { Modal } from './components/ui/Modal.jsx';
 import { AktenList } from './components/AktenList.jsx';
@@ -7,7 +7,7 @@ import Stammdatenverwaltung from './components/Stammdatenverwaltung.jsx';
 import Aktenansicht from './components/Aktenansicht.jsx';
 import PersonForm from './components/PersonForm.jsx';
 import AdminPanel from './components/AdminPanel/AdminPanel.jsx';
-import { login, logout } from './services/authService.js';
+import { login, logout, getToken, getUserRole } from './services/authService.js';
 
 // Hauptkomponente, die die gesamte Anwendung darstellt
 export const App = () => {
@@ -15,6 +15,12 @@ export const App = () => {
     const [userRole, setUserRole] = useState(null);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+
+    const handleLogout = useCallback(() => {
+        logout();
+        setIsLoggedIn(false);
+        setUserRole(null);
+    }, []);
 
     const {
         isAppReady,
@@ -46,7 +52,7 @@ export const App = () => {
         handleImport,
         nextCaseNumber,
         setSearchTerm,
-    } = useKanzleiLogic(isLoggedIn);
+    } = useKanzleiLogic(isLoggedIn, handleLogout);
 
     const [currentView, setCurrentView] = useState('akten');
     const [initialStammdatenTab, setInitialStammdatenTab] = useState('mandanten');
@@ -75,11 +81,7 @@ export const App = () => {
         }
     };
 
-    useEffect(() => {
-        // Beim ersten Laden der App den alten Zustand bereinigen, um Endlosschleifen bei ungültigen Token zu verhindern.
-        // Ein besserer Ansatz wäre, den Token hier zu validieren, aber für den Moment ist das die sicherste Lösung.
-        logout();
-    }, []);
+
 
     const navigateToStammdaten = (tab = 'mandanten') => {
         setInitialStammdatenTab(tab);

@@ -120,6 +120,23 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
         anrede, vorname, nachname, strasse, hausnummer, plz, stadt, email, telefon, iban, notizen
       } = formData;
 
+      if (unfallDatum) {
+        const today = new Date();
+        const selectedDate = new Date(unfallDatum);
+
+        // Set time to 0 to compare dates only
+        today.setHours(0, 0, 0, 0);
+        
+        // Adjust for timezone offset from the input
+        selectedDate.setMinutes(selectedDate.getMinutes() + selectedDate.getTimezoneOffset());
+        selectedDate.setHours(0, 0, 0, 0);
+
+        if (selectedDate > today) {
+          setError('Das Unfalldatum darf nicht in der Zukunft liegen.');
+          return;
+        }
+      }
+
       let submissionData = {
         id, mandantId, status, gegnerId, unfallDatum, kennzeichen,
         mdtKennzeichen, gegnerKennzeichen, sonstigeBeteiligte, beteiligteDritte,

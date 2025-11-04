@@ -6,10 +6,10 @@ const handleResponse = async (response) => {
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
       // Token ist ungültig oder abgelaufen
-      sessionStorage.removeItem('authToken');
-      sessionStorage.removeItem('userRole');
-      window.location.reload(); // Seite neu laden, um zum Login zu zwingen
-      throw new Error('Sitzung abgelaufen. Bitte erneut anmelden.');
+      // Wir werfen einen spezifischen Fehler, den die UI abfangen kann, um den Logout-Zustand zu verwalten.
+      const authError = new Error('Authentication failed');
+      authError.status = response.status;
+      throw authError;
     }
     const errorData = await response.json().catch(() => null);
     const message = errorData?.message || response.statusText;
@@ -142,6 +142,10 @@ export const uploadDocument = (recordId, file, signal) => {
     signal,
   });
 };
+
+export const deleteDocument = (documentId, signal) => apiRequest(`${API_BASE_URL}/documents/${documentId}`, { method: 'DELETE', signal });
+
+export const getDocument = (documentId, signal) => apiRequest(`${API_BASE_URL}/documents/${documentId}`, { signal });
 
 export const exportData = async () => {
   console.warn('Export functionality is not implemented on the backend.');

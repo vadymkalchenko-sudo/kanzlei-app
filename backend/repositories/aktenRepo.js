@@ -38,9 +38,11 @@ const deleteFileIfExists = async (filePath) => {
 const findAll = async () => {
     const aktenResult = await pool.query('SELECT * FROM akten');
     const notizenResult = await pool.query('SELECT * FROM notizen');
+    const dokumenteResult = await pool.query('SELECT * FROM dokumente');
     const akten = aktenResult.rows.map(akte => ({
         ...akte,
-        notizen: notizenResult.rows.filter(n => n.akte_id === akte.id)
+        notizen: notizenResult.rows.filter(n => n.akte_id === akte.id),
+        dokumente: dokumenteResult.rows.filter(d => d.akte_id === akte.id)
     }));
     return akten;
 };
@@ -200,7 +202,7 @@ module.exports = {
     removeDocument,
     addNote: async (akteId, noteData) => {
         const { titel, inhalt, typ, betrag_soll, betrag_haben, autor } = noteData;
-        const id = `note_${crypto.randomUUID()}`;
+        const id = crypto.randomUUID();
         const query = `
             INSERT INTO notizen (id, akte_id, titel, inhalt, typ, betrag_soll, betrag_haben, autor)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)

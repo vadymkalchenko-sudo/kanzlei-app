@@ -1,4 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
+import * as api from '../api';
 import { Button } from './ui/Button.jsx';
 import { Modal } from './ui/Modal.jsx';
 import DocumentForm from './DocumentForm.jsx';
@@ -148,29 +149,10 @@ export const Aktenansicht = ({
     onGoBack();
   };
 
-  const base64ToBlob = async (base64, mimeType) => {
-    try {
-        const response = await fetch(base64);
-        const blob = await response.blob();
-        return blob;
-    } catch (error) {
-        console.error('Error converting base64 to Blob:', error);
-        // Fallback for environments that might not support fetching data URIs directly
-        // Or for specific browser quirks. This is a more robust version of the original.
-        const safeBase64 = base64.split(',')[1] || base64;
-        const byteCharacters = atob(safeBase64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        return new Blob([byteArray], { type: mimeType });
-    }
-  };
 
   const combinedItems = useMemo(() => {
-    const documents = (record?.dokumente || []).filter(Boolean).map(doc => ({ ...doc, itemType: 'document', date: doc.createdAt }));
-    const notes = (record?.notizen || []).filter(Boolean).map(note => ({ ...note, itemType: 'note', date: note.aktualisierungsdatum }));
+    const documents = (record?.dokumente || []).filter(Boolean).map(doc => ({ ...doc, itemType: 'document', date: doc.hochgeladen_am, name: doc.dateiname }));
+    const notes = (record?.notizen || []).filter(note => note && note.typ !== 'Aufgabe').map(note => ({ ...note, itemType: 'note', date: note.aktualisierungsdatum || note.erstellungsdatum }));
 
     const allItems = [...documents, ...notes];
 
@@ -192,14 +174,38 @@ export const Aktenansicht = ({
     }, 0);
   }, [combinedItems]);
 
-  const handleOpenDocument = (documentId, filename, mimetype) => {
-    // Für die neue Implementierung: Aufruf der neuen Dokumenten-Download-Route
-    // In der realen Implementierung würde hier ein API-Aufruf stattfinden
-    // Derzeit simulieren wir das Verhalten
-    console.log('Öffne Dokument:', documentId, filename);
-    // In der echten Implementierung:
-    // window.open(`/api/documents/${documentId}`, '_blank');
-    // Oder alternativ mit fetch und Blob für direkten Download
+  const handleOpenDocument = async (documentId) => {
+    try {
+      // Finde das Dokument zuerst im lokalen State
+      const localDoc = record.dokumente.find(d => d.id === documentId);
+      if (!localDoc) throw new Error('Dokument nicht im lokalen State gefunden.');
+
+      let docData = localDoc;
+      // Wenn die Base64-Daten fehlen, lade sie explizit nach
+      if (!docData.data_b64) {
+        docData = await api.getDocument(documentId);
+      }
+
+      if (!docData || !docData.data_b64) {
+        throw new Error('Dokumentendaten konnten nicht geladen werden.');
+      }
+
+      const byteCharacters = atob(docData.data_b64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: docData.mimetype });
+      
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+
+    } catch (error) {
+      console.error('Fehler beim Öffnen des Dokuments:', error);
+      alert('Fehler beim Öffnen des Dokuments.');
+    }
   };
 
   if (!record || !mandant) {
@@ -358,13 +364,13 @@ export const Aktenansicht = ({
                     combinedItems.map((item) => (
                       <tr
                         key={item.id}
-                        onDoubleClick={() => item.itemType === 'document' ? handleOpenDocument(item.data_b64, item.name, item.mimetype) : (canEdit && handleOpenNoteModal(item))}
+                        onDoubleClick={() => item.itemType === 'document' ? handleOpenDocument(item.id) : (canEdit && handleOpenNoteModal(item))}
                         className={`hover:bg-gray-50 ${canEdit ? 'cursor-pointer' : ''}`}
                       >
                         <td className="px-4 py-2 border-b text-center">{item.itemType === 'document' ? '📄' : '📝'}</td>
                         <td className="px-4 py-2 border-b">{formatDate(item.date)}</td>
-                        <td className="px-4 py-2 border-b">{item.itemType === 'document' ? item.name : item.titel}</td>
-                        <td className="px-4 py-2 border-b">{item.itemType === 'document' ? simplifyFormat(item) : item.typ}</td>
+                        <td className="px-4 py-2 border-b">{item.itemType === 'document' ? item.dateiname : (item.titel || item.inhalt)}</td>
+                        <td className="px-4 py-2 border-b">{item.itemType === 'document' ? simplifyFormat(item) : item.typ || 'Notiz'}</td>
                         <td className="px-4 py-2 border-b text-right" onClick={() => canEdit && handleCellClick(item, 'soll')}>
                             {editingCell?.id === item.id && editingCell?.field === 'soll' ? (
                                 <input
@@ -378,7 +384,7 @@ export const Aktenansicht = ({
                                     autoFocus
                                 />
                             ) : (
-                                `${(item.betrag_soll || 0).toFixed(2).replace('.', ',')} €`
+                                `${(parseFloat(item.betrag_soll) || 0).toFixed(2).replace('.', ',')} €`
                             )}
                         </td>
                         <td className="px-4 py-2 border-b text-right" onClick={() => canEdit && handleCellClick(item, 'haben')}>
@@ -394,7 +400,7 @@ export const Aktenansicht = ({
                                     autoFocus
                                 />
                             ) : (
-                                `${(item.betrag_haben || 0).toFixed(2).replace('.', ',')} €`
+                                `${(parseFloat(item.betrag_haben) || 0).toFixed(2).replace('.', ',')} €`
                             )}
                         </td>
                         {canEdit && (
@@ -439,7 +445,7 @@ export const Aktenansicht = ({
         <div className="lg:col-span-1">
           <AufgabenPanel
             recordId={record.id}
-            aufgaben={record.aufgaben || []}
+            aufgaben={(record.notizen || []).filter(note => note.typ === 'Aufgabe')}
             onAddAufgabe={onAddAufgabe}
             onUpdateAufgabe={onUpdateAufgabe}
             onDeleteAufgabe={onDeleteAufgabe}

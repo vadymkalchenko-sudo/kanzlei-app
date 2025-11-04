@@ -74,8 +74,8 @@ const AufgabenPanel = ({
                         />
                     )}
                     <div className="flex-grow">
-                        <p className="font-semibold text-gray-800">{aufgabe.titel}</p>
-                        <p className="text-sm text-gray-600">{formatDate(aufgabe.datum)}</p>
+                        <p className="font-semibold text-gray-800">{aufgabe.titel || aufgabe.beschreibung}</p>
+                        <p className="text-sm text-gray-600">{formatDate(aufgabe.erstellungsdatum)}</p>
                         {aufgabe.details && <p className="text-sm text-gray-500 mt-1 whitespace-pre-wrap">{aufgabe.details}</p>}
                     </div>
                 </div>
