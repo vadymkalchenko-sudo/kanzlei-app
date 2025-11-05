@@ -1,5 +1,59 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import * as api from '../api';
+<<<<<<< HEAD
+=======
+import { readFileAsBase64 } from '../utils';
+
+// Generiert eine neue Aktennummer im Format [Laufende Nummer].[Zweistelliges Jahr].awr
+// Prüft zunächst, ob die Nummer bereits existiert und sucht dann nach einer eindeutigen Nummer
+const generateNewCaseNumber = async (records, apiCall) => {
+  const year = new Date().getFullYear().toString().slice(-2);
+  
+  // Erste Möglichkeit: Wenn keine Akten existieren, beginne mit 1
+  if (records.length === 0) {
+    return `1.${year}.awr`;
+  }
+  
+  // Hole alle vorhandenen Aktennummern aus der Datenbank
+  let existingNumbers = [];
+  try {
+    // Wenn eine API-Funktion zur Verfügung steht, verwenden wir diese
+    if (apiCall && typeof apiCall === 'function') {
+      const allRecords = await apiCall();
+      existingNumbers = allRecords.map(record => record.aktenzeichen || record.caseNumber).filter(Boolean);
+    } else {
+      // Fallback: Verwende die lokalen Records (kann bei Offline-Modus helfen)
+      existingNumbers = records.map(record => record.aktenzeichen || record.caseNumber).filter(Boolean);
+    }
+  } catch (error) {
+    console.warn('Konnte keine vorhandenen Aktennummern abrufen, verwende lokale Liste:', error);
+  }
+  
+  // Finde die höchste Nummer in der Datenbank
+  let maxNumber = 0;
+  existingNumbers.forEach(number => {
+    // Extrahiere die Zahl aus dem Format "X.YY.awr"
+    const match = number.match(/^(\d+)\.(\d+)\.awr$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxNumber) {
+        maxNumber = num;
+      }
+    }
+  });
+  
+  // Erzeuge die nächste eindeutige Nummer
+  const nextId = maxNumber + 1;
+  return `${nextId}.${year}.awr`;
+};
+
+// Fallback-Funktion für Fälle, wo keine Datenbankabfrage möglich ist
+const generateNewCaseNumberFallback = (totalRecords) => {
+  const year = new Date().getFullYear().toString().slice(-2);
+  const nextId = totalRecords + 1;
+  return `${nextId}.${year}.awr`;
+};
+>>>>>>> 00eba4d0 (Alles Funktioniert-Aktenzeichen muss noch)
 
 /**
  * Ein benutzerdefinierter Hook, der die gesamte Geschäftslogik der Anwendung kapselt.
@@ -378,6 +432,191 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
     }
   };
 
+<<<<<<< HEAD
+=======
+  const [nextCaseNumber, setNextCaseNumber] = useState('');
+
+  // Funktion zur Aktualisierung der nächsten Aktennummer
+  const updateNextCaseNumber = useCallback(async () => {
+    try {
+      const newNumber = await generateNewCaseNumber(records, api.getRecords);
+      setNextCaseNumber(newNumber);
+    } catch (error) {
+      console.error('Fehler bei der Generierung der Aktennummer:', error);
+      // Fallback auf alte Methode
+      const fallbackNumber = generateNewCaseNumberFallback(records.length);
+      setNextCaseNumber(fallbackNumber);
+    }
+  }, [records]);
+
+  // Initialisierung beim Start
+  useEffect(() => {
+    updateNextCaseNumber();
+  }, [updateNextCaseNumber]);
+
+  const handleRecordSubmit = async (formData) => {
+    try {
+      const { clientJustCreated, ...recordFormData } = formData;
+      const {
+        id: recordId, // Explizit als Akten-ID benennen
+        mandantId, status, gegnerId, unfallDatum, kennzeichen,
+        mdtKennzeichen, gegnerKennzeichen, sonstigeBeteiligte, beteiligteDritte
+      } = recordFormData;
+
+      if (!mandantId) {
+        throw new Error("Cannot submit record without a client (mandantId).");
+      }
+
+      // Backend expects: aktenzeichen, status, mandanten_id, dokumente_pfad
+      const payloadData = {
+        aktenzeichen: recordId ? (records.find(r => r.id === recordId)?.caseNumber || '') : nextCaseNumber,
+        status,
+        mandanten_id: mandantId,
+        dokumente_pfad: '', // optional, leer bei Neuanlage
+      };
+
+      // Zusätzliche Felder für spätere Erweiterungen (werden ignoriert, falls Backend sie nicht nutzt)
+      // payloadData.gegnerId = gegnerId;
+      // payloadData.schadenDatum = unfallDatum;
+      // payloadData.kennzeichen = kennzeichen;
+      // payloadData.mdtKennzeichen = mdtKennzeichen;
+      // payloadData.gegnerKennzeichen = gegnerKennzeichen;
+      // payloadData.sonstigeBeteiligte = sonstigeBeteiligte;
+      // payloadData.beteiligteDritte = beteiligteDritte;
+
+      // Step 1: Extract single file from form input (if present) and remove it from the record payload
+      const extractFirstFileFromFormData = (data) => {
+        if (!data || typeof File === 'undefined') return null;
+        // Prefer common keys first
+        const preferredKeys = ['fileAttachment', 'file', 'attachment'];
+        for (const key of preferredKeys) {
+          if (data[key] instanceof File) return data[key];
+        }
+        // Fallback: find the first File anywhere at top-level
+        for (const value of Object.values(data)) {
+          if (value instanceof File) return value;
+        }
+        return null;
+      };
+
+      const fileToUpload = extractFirstFileFromFormData(formData);
+
+      // Remove any file and file-related metadata from payload (JSON only)
+      const stripAttachmentMetaFields = (obj) => {
+        const clean = { ...obj };
+        Object.keys(clean).forEach((key) => {
+          const value = clean[key];
+          // Remove any File instances
+          if (typeof File !== 'undefined' && value instanceof File) {
+            delete clean[key];
+            return;
+          }
+          // Remove keys that look like attachment/file metadata
+          if (/file|attachment|anhang/i.test(key)) {
+            delete clean[key];
+            return;
+          }
+          // Remove objects that look like file metadata blobs
+          if (value && typeof value === 'object' && !Array.isArray(value)) {
+            const metaProps = ['name', 'size', 'type', 'lastModified', 'path', 'webkitRelativePath'];
+            const hasAnyMeta = metaProps.some((p) => Object.prototype.hasOwnProperty.call(value, p));
+            if (hasAnyMeta) {
+              delete clean[key];
+            }
+          }
+        });
+        return clean;
+      };
+
+      // payloadData = stripAttachmentMetaFields(payloadData);
+
+      // Deep-clean helper to ensure full JSON-serializability (no File/Blob or file-metadata-like objects)
+      const deepCleanSerializable = (value) => {
+        const isPlainObject = (v) => Object.prototype.toString.call(v) === '[object Object]';
+        if (value == null) return value;
+        if (typeof File !== 'undefined' && value instanceof File) return undefined;
+        if (typeof Blob !== 'undefined' && value instanceof Blob) return undefined;
+        if (Array.isArray(value)) {
+          const cleaned = value
+            .map((item) => deepCleanSerializable(item))
+            .filter((item) => item !== undefined);
+          return cleaned;
+        }
+        if (isPlainObject(value)) {
+          const metaProps = ['name', 'size', 'type', 'lastModified', 'path', 'webkitRelativePath'];
+          const hasAnyMeta = metaProps.some((p) => Object.prototype.hasOwnProperty.call(value, p));
+          if (hasAnyMeta) {
+            return undefined;
+          }
+          const out = {};
+          Object.entries(value).forEach(([k, v]) => {
+            // Drop keys that look like file-ish
+            if (/file|attachment|anhang/i.test(k)) return;
+            const cleaned = deepCleanSerializable(v);
+            if (cleaned !== undefined) out[k] = cleaned;
+          });
+          return out;
+        }
+        if (typeof value === 'function') return undefined;
+        return value;
+      };
+
+      if (recordId) {
+        const originalRecord = records.find(r => r.id === recordId);
+        if (!originalRecord) {
+          throw new Error("Original record not found for update.");
+        }
+
+        const updatedRecordRaw = { ...originalRecord, ...payloadData };
+
+        if (updatedRecordRaw.status === 'geschlossen' && originalRecord?.status !== 'geschlossen') {
+          const clientForArchiving = mandanten.find(m => m.id === mandantId);
+          updatedRecordRaw.archivedMandantData = { ...clientForArchiving };
+          setFlashMessage('Akte wurde geschlossen und Mandantendaten archiviert.');
+        }
+        const updatedRecord = deepCleanSerializable(updatedRecordRaw);
+        const savedRecord = await api.updateRecord(recordId, updatedRecord);
+        if (fileToUpload && savedRecord?.id) {
+          try {
+            await api.uploadDocument(savedRecord.id, fileToUpload);
+          } catch (uploadErr) {
+            console.error('Fehler beim separaten Datei-Upload (Update):', uploadErr);
+          }
+        }
+        setFlashMessage('Akte erfolgreich aktualisiert!');
+      } else {
+        const newRecordRaw = {
+            ...payloadData,
+            aktenzeichen: nextCaseNumber,
+            dokumente: [],
+            notizen: [],
+            aufgaben: [],
+        };
+        const newRecord = deepCleanSerializable(newRecordRaw);
+        const createdRecord = await api.createRecord(newRecord);
+        if (fileToUpload && createdRecord?.id) {
+          try {
+            await api.uploadDocument(createdRecord.id, fileToUpload);
+          } catch (uploadErr) {
+            console.error('Fehler beim separaten Datei-Upload (Create):', uploadErr);
+          }
+        }
+        if (clientJustCreated) {
+          setFlashMessage('Neuer Mandant und Akte erfolgreich angelegt!');
+        } else {
+          setFlashMessage('Neue Akte erfolgreich angelegt!');
+        }
+      }
+
+      fetchData();
+    } catch (error) {
+      setFlashMessage(error.message);
+      console.error(error);
+      throw error; // Fehler an die aufrufende Komponente weiterleiten
+    }
+  };
+
+>>>>>>> 00eba4d0 (Alles Funktioniert-Aktenzeichen muss noch)
   const handleUpdateRecord = async (recordId, updatedData) => {
     try {
       const recordToUpdate = records.find((r) => r.id === recordId);
