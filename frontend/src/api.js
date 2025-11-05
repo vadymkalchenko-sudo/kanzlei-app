@@ -156,3 +156,4 @@ export const importData = async (data) => {
   console.warn('Import functionality is not implemented on the backend.');
   return Promise.resolve({ message: 'Daten erfolgreich importiert' });
 };
+

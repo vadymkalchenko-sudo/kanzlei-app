@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from './ui/Button.jsx';
 import { Modal } from './ui/Modal.jsx';
 import PersonForm from './PersonForm.jsx';
 
 const initialFormData = {
+  aktenzeichen: '',
   anrede: '',
   vorname: '',
   nachname: '',
@@ -26,8 +27,8 @@ const initialFormData = {
   mandantId: '',
 };
 
-export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, onCancel, nextCaseNumber, handleDritteSubmit, handleMandantSubmit }) => {
-  const [formData, setFormData] = useState({ ...initialFormData, ...akte });
+export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, onCancel, nextCaseNumber, allRecords, userRole, handleDritteSubmit, handleMandantSubmit }) => {
+  const [formData, setFormData] = useState({ ...initialFormData, aktenzeichen: akte ? akte.aktenzeichen : nextCaseNumber });
   const [isNewMandant, setIsNewMandant] = useState(!akte?.mandantId);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -37,6 +38,27 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
   const [isAddBeteiligteModalOpen, setIsAddBeteiligteModalOpen] = useState(false);
   const [isAddMandantModalOpen, setIsAddMandantModalOpen] = useState(false);
   const [isAddGegnerModalOpen, setIsAddGegnerModalOpen] = useState(false);
+
+  const isPrivilegedUser = userRole === 'admin' || userRole === 'power_user';
+
+  useEffect(() => {
+    if (!akte) {
+      setFormData(prev => ({ ...prev, aktenzeichen: nextCaseNumber }));
+    }
+  }, [nextCaseNumber, akte]);
+
+  const aktenzeichenError = useMemo(() => {
+    if (akte) return null;
+
+    const trimmedAz = formData.aktenzeichen.trim();
+    if (!trimmedAz) return 'Aktenzeichen darf nicht leer sein.';
+    if (!/^\d+\.\d{2}\.awr$/.test(trimmedAz)) return 'Format muss 123.25.awr sein.';
+    
+    const isDuplicate = allRecords.some(r => r.aktenzeichen === trimmedAz);
+    if (isDuplicate) return 'Dieses Aktenzeichen ist bereits vergeben.';
+
+    return null;
+  }, [formData.aktenzeichen, allRecords, akte]);
 
   useEffect(() => {
     if (akte && akte.beteiligteDritte && dritteBeteiligte?.length > 0) {
@@ -57,6 +79,7 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
           ...prev, ...mandant, status: akte.status, gegnerId: akte.gegnerId,
           unfallDatum: akte.schadenDatum, kennzeichen: akte.kennzeichen,
           sonstigeBeteiligte: akte.sonstigeBeteiligte || '',
+          aktenzeichen: akte.aktenzeichen,
         }));
       }
     }
@@ -65,12 +88,12 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
   const handleMandantSelectChange = (e) => {
     const mandantId = e.target.value;
     if (!mandantId) {
-      setFormData({ ...initialFormData, isNewMandant: false });
+      setFormData({ ...initialFormData, aktenzeichen: nextCaseNumber, isNewMandant: false });
       return;
     }
     const selectedMandant = mandanten.find((m) => m.id === mandantId);
     if (selectedMandant) {
-      setFormData(prev => ({ ...prev, ...initialFormData, ...selectedMandant, mandantId: selectedMandant.id }));
+      setFormData(prev => ({ ...prev, ...initialFormData, ...selectedMandant, aktenzeichen: prev.aktenzeichen, mandantId: selectedMandant.id }));
     }
   };
 
@@ -113,15 +136,20 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
     setError('');
     setSuccessMessage('');
 
+    if (!akte && aktenzeichenError) {
+        setError(aktenzeichenError);
+        return;
+    }
+
     try {
       const {
         id, mandantId, status, gegnerId, unfallDatum, kennzeichen,
         mdtKennzeichen, gegnerKennzeichen, sonstigeBeteiligte, beteiligteDritte,
-        anrede, vorname, nachname, strasse, hausnummer, plz, stadt, email, telefon, iban, notizen
+        anrede, vorname, nachname, strasse, hausnummer, plz, stadt, email, telefon, iban, notizen, aktenzeichen
       } = formData;
 
       if (unfallDatum) {
-        const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+        const today = new Date().toISOString().split('T')[0];
         if (unfallDatum > today) {
           setError('Das Unfalldatum darf nicht in der Zukunft liegen.');
           return;
@@ -131,7 +159,7 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
       let submissionData = {
         id, mandantId, status, gegnerId, unfallDatum, kennzeichen,
         mdtKennzeichen, gegnerKennzeichen, sonstigeBeteiligte, beteiligteDritte,
-        anrede, vorname, nachname, strasse, hausnummer, plz, stadt, email, telefon, iban, notizen
+        anrede, vorname, nachname, strasse, hausnummer, plz, stadt, email, telefon, iban, notizen, aktenzeichen
       };
 
       if (!akte) {
@@ -160,9 +188,9 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
       await onRecordSubmit({ ...submissionData, clientJustCreated, status: akte ? formData.status : 'offen' });
       
       setSuccessMessage('Akte erfolgreich gespeichert!');
-      setFormData(initialFormData); // Reset form
+      setFormData(initialFormData);
       setTimeout(() => {
-          onCancel(); // Close form after a delay
+          onCancel();
       }, 1500);
 
     } catch (error) {
@@ -207,6 +235,19 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
         <div className="flex-1 p-4 border rounded-lg bg-gray-50">
           <h4 className="text-xl font-semibold mb-4 border-b pb-2">Falldaten</h4>
           <div className="space-y-3">
+             <div className="pt-2">
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="aktenzeichen">Aktennummer</label>
+                <input 
+                    type="text" 
+                    name="aktenzeichen" 
+                    id="aktenzeichen" 
+                    value={formData.aktenzeichen}
+                    onChange={handleChange}
+                    className={`input-field w-full ${!isPrivilegedUser || !!akte ? 'bg-gray-200' : ''}`}
+                    disabled={!isPrivilegedUser || !!akte}
+                />
+                {!akte && aktenzeichenError && <p className="text-red-500 text-xs mt-1">{aktenzeichenError}</p>}
+            </div>
             <input type="text" name="mdtKennzeichen" value={formData.mdtKennzeichen} onChange={handleChange} placeholder="MDT Kennzeichen" className="input-field w-full" />
             <input type="text" name="gegnerKennzeichen" value={formData.gegnerKennzeichen} onChange={handleChange} placeholder="Gegner Kennzeichen" className="input-field w-full" />
             <div>
@@ -253,8 +294,7 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
                 </select>
               </div>
             )}
-            <div className="pt-2"><label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="caseNumber">Aktennummer</label><input type="text" name="caseNumber" id="caseNumber" value={formData.caseNumber || nextCaseNumber} className="input-field bg-gray-200 w-full" disabled /></div>
-
+            
             <div className="pt-4 border-t mt-4">
               <button type="button" onClick={() => setIsBeteiligteOpen(!isBeteiligteOpen)} className="w-full flex justify-between items-center text-lg font-semibold text-left">
                 Beteiligte
@@ -296,7 +336,7 @@ export const AktenForm = ({ akte, mandanten, dritteBeteiligte, onRecordSubmit, o
       </div>
       <div className="flex justify-end space-x-4 mt-8">
         <Button type="button" onClick={onCancel} className="bg-gray-300 hover:bg-gray-400 text-gray-800">Abbrechen</Button>
-        <Button type="submit">Speichern</Button>
+        <Button type="submit" disabled={!akte && !!aktenzeichenError}>Speichern</Button>
       </div>
 
       <Modal isOpen={isAddBeteiligteModalOpen} onClose={() => setIsAddBeteiligteModalOpen(false)}>

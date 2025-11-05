@@ -1,13 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import * as api from '../api';
-import { readFileAsBase64 } from '../utils';
-
-// Generiert eine neue Aktennummer im Format [Laufende Nummer].[Zweistelliges Jahr].awr
-const generateNewCaseNumber = (totalRecords) => {
-  const year = new Date().getFullYear().toString().slice(-2);
-  const nextId = totalRecords + 1;
-  return `${nextId}.${year}.awr`;
-};
 
 /**
  * Ein benutzerdefinierter Hook, der die gesamte Geschäftslogik der Anwendung kapselt.
@@ -18,6 +10,7 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
   const [records, setRecords] = useState([]);
   const [mandanten, setMandanten] = useState([]);
   const [dritteBeteiligte, setDritteBeteiligte] = useState([]);
+  
   const [message, setMessage] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const messageTimerRef = useRef(null);
@@ -37,17 +30,16 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
   const fetchData = useCallback(async (signal) => {
     try {
       console.log("--- [FETCH START] ---");
-      const mandantenData = await api.getMandanten(signal);
-      console.log("[FETCH SUCCESS] Mandanten:", mandantenData);
+      const [mandantenData, recordsData, dritteData] = await Promise.all([
+        api.getMandanten(signal),
+        api.getRecords(signal),
+        api.getDritteBeteiligte(signal),
+      ]);
+
       setMandanten(mandantenData || []);
-
-      const recordsData = await api.getRecords(signal);
-      console.log("[FETCH SUCCESS] Akten:", recordsData);
       setRecords(recordsData || []);
-
-      const dritteData = await api.getDritteBeteiligte(signal);
-      console.log("[FETCH SUCCESS] Dritte:", dritteData);
       setDritteBeteiligte(dritteData || []);
+      
       console.log("--- [FETCH END] ---");
 
     } catch (error) {
@@ -62,7 +54,7 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
    } finally {
       setIsAppReady(true);
     }
-  }, []);
+  }, [onLogout]);
 
   const filteredRecords = useMemo(() => {
     if (!searchTerm) {
@@ -79,41 +71,28 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
 
   const todayDueRecords = useMemo(() => {
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+    today.setHours(0, 0, 0, 0);
 
     const recordsWithDueTasks = records.map(record => {
-        // Safely access aufgaben, defaulting to an empty array.
         const aufgaben = record.aufgaben || [];
-
         const openTasks = aufgaben.filter(aufgabe => {
-            if (aufgabe.erledigt) {
-                return false;
-            }
-            // A task must have a deadline to be considered.
-            // It can be under the property 'deadline' or 'datum'.
+            if (aufgabe.erledigt) return false;
             const deadlineDate = aufgabe.deadline || aufgabe.datum;
-            if (!deadlineDate) {
-                return false;
-            }
+            if (!deadlineDate) return false;
             const deadline = new Date(deadlineDate);
             return deadline <= today;
         });
 
-        if (openTasks.length === 0) {
-            return null;
-        }
+        if (openTasks.length === 0) return null;
 
-        // Find the oldest deadline among the open tasks for sorting purposes.
         const oldestDeadline = openTasks.reduce((oldest, current) => {
             const currentDate = new Date(current.deadline || current.datum);
             return currentDate < oldest ? currentDate : oldest;
         }, new Date(openTasks[0].deadline || openTasks[0].datum));
 
-        // Return the record along with its most critical deadline.
         return { ...record, oldestDeadline };
-    }).filter(Boolean); // Filter out records with no overdue tasks.
+    }).filter(Boolean);
 
-    // Sort records so that those with the most overdue tasks appear first.
     recordsWithDueTasks.sort((a, b) => a.oldestDeadline - b.oldestDeadline);
 
     return recordsWithDueTasks;
@@ -130,6 +109,43 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
     }
   }, [isLoggedIn, fetchData]);
 
+  const nextCaseNumber = useMemo(() => {
+    if (!records) return '1.25.awr';
+
+    const highestNum = records.reduce((max, record) => {
+        const match = record.aktenzeichen.match(/^(\d+)\.\d{2}\.awr$/);
+        if (match) {
+            return Math.max(max, parseInt(match[1], 10));
+        }
+        return max;
+    }, 0);
+
+    const nextNum = highestNum + 1;
+    const year = new Date().getFullYear().toString().slice(-2);
+    return `${nextNum}.${year}.awr`;
+  }, [records]);
+
+
+  const handleRecordSubmit = async (formData) => {
+    try {
+        const { clientJustCreated, ...recordFormData } = formData;
+
+        if (formData.id) {
+            await api.updateRecord(formData.id, recordFormData);
+            setFlashMessage('Akte erfolgreich aktualisiert!');
+        } else {
+            await api.createRecord(recordFormData);
+            setFlashMessage('Neue Akte erfolgreich angelegt!');
+        }
+
+      fetchData();
+    } catch (error) {
+      setFlashMessage(`Fehler: ${error.message}`);
+      console.error(error);
+      throw error;
+    }
+  };
+  
   const handleMandantSubmit = async (mandantData, options = { showMessage: true, fetchData: true }) => {
     try {
       let newMandant = null;
@@ -173,7 +189,7 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
       );
 
       if (openRecords.length > 0) {
-        const recordNumbers = openRecords.map((r) => r.caseNumber).join(', ');
+        const recordNumbers = openRecords.map((r) => r.aktenzeichen).join(', ');
         setFlashMessage(
           `Mandant kann nicht gelöscht werden. Es gibt noch offene Akten: ${recordNumbers}`
         );
@@ -182,7 +198,7 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
 
       await api.deleteMandant(mandantId);
       setFlashMessage('Mandant erfolgreich gelöscht!');
-      fetchData(); // Daten neu laden
+      fetchData();
     } catch (error) {
       setFlashMessage(`Fehler: ${error.message}`);
     }
@@ -264,8 +280,6 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
     }
   };
 
-  // --- Aufgaben Management ---
-
   const handleAddAufgabe = async (recordId, aufgabeData) => {
     try {
       const noteData = {
@@ -327,9 +341,9 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
 
   const handleDeleteDocument = async (recordId, documentId) => {
     try {
-      await api.deleteDocument(documentId); // Korrekte API-Funktion aufrufen
+      await api.deleteDocument(documentId);
       setFlashMessage('Dokument erfolgreich gelöscht.');
-      fetchData(); // Daten neu laden, um die UI zu aktualisieren
+      fetchData();
     } catch (error) {
       setFlashMessage(`Fehler beim Löschen des Dokuments: ${error.message}`);
     }
@@ -341,12 +355,12 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
         await api.updateDritteBeteiligte(data.id, data);
         setFlashMessage('Dritter Beteiligter erfolgreich aktualisiert!');
         fetchData();
-        return null; // Or the updated data
+        return null;
       } else {
         const newItem = await api.createDritteBeteiligte(data);
         setFlashMessage('Neuer Dritter Beteiligter erfolgreich angelegt!');
         fetchData();
-        return newItem; // Return the new item
+        return newItem;
       }
     } catch (error) {
       setFlashMessage(`Fehler: ${error.message}`);
@@ -361,170 +375,6 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
       fetchData();
     } catch (error) {
       setFlashMessage(`Fehler: ${error.message}`);
-    }
-  };
-
-  const nextCaseNumber = useMemo(() => generateNewCaseNumber(records.length), [records.length]);
-
-  const handleRecordSubmit = async (formData) => {
-    try {
-      const { clientJustCreated, ...recordFormData } = formData;
-      const {
-        id: recordId, // Explizit als Akten-ID benennen
-        mandantId, status, gegnerId, unfallDatum, kennzeichen,
-        mdtKennzeichen, gegnerKennzeichen, sonstigeBeteiligte, beteiligteDritte
-      } = recordFormData;
-
-      if (!mandantId) {
-        throw new Error("Cannot submit record without a client (mandantId).");
-      }
-
-      // Backend expects: aktenzeichen, status, mandanten_id, dokumente_pfad
-      const payloadData = {
-        aktenzeichen: recordId ? (records.find(r => r.id === recordId)?.caseNumber || '') : nextCaseNumber,
-        status,
-        mandanten_id: mandantId,
-        dokumente_pfad: '', // optional, leer bei Neuanlage
-      };
-
-      // Zusätzliche Felder für spätere Erweiterungen (werden ignoriert, falls Backend sie nicht nutzt)
-      // payloadData.gegnerId = gegnerId;
-      // payloadData.schadenDatum = unfallDatum;
-      // payloadData.kennzeichen = kennzeichen;
-      // payloadData.mdtKennzeichen = mdtKennzeichen;
-      // payloadData.gegnerKennzeichen = gegnerKennzeichen;
-      // payloadData.sonstigeBeteiligte = sonstigeBeteiligte;
-      // payloadData.beteiligteDritte = beteiligteDritte;
-
-      // Step 1: Extract single file from form input (if present) and remove it from the record payload
-      const extractFirstFileFromFormData = (data) => {
-        if (!data || typeof File === 'undefined') return null;
-        // Prefer common keys first
-        const preferredKeys = ['fileAttachment', 'file', 'attachment'];
-        for (const key of preferredKeys) {
-          if (data[key] instanceof File) return data[key];
-        }
-        // Fallback: find the first File anywhere at top-level
-        for (const value of Object.values(data)) {
-          if (value instanceof File) return value;
-        }
-        return null;
-      };
-
-      const fileToUpload = extractFirstFileFromFormData(formData);
-
-      // Remove any file and file-related metadata from payload (JSON only)
-      const stripAttachmentMetaFields = (obj) => {
-        const clean = { ...obj };
-        Object.keys(clean).forEach((key) => {
-          const value = clean[key];
-          // Remove any File instances
-          if (typeof File !== 'undefined' && value instanceof File) {
-            delete clean[key];
-            return;
-          }
-          // Remove keys that look like attachment/file metadata
-          if (/file|attachment|anhang/i.test(key)) {
-            delete clean[key];
-            return;
-          }
-          // Remove objects that look like file metadata blobs
-          if (value && typeof value === 'object' && !Array.isArray(value)) {
-            const metaProps = ['name', 'size', 'type', 'lastModified', 'path', 'webkitRelativePath'];
-            const hasAnyMeta = metaProps.some((p) => Object.prototype.hasOwnProperty.call(value, p));
-            if (hasAnyMeta) {
-              delete clean[key];
-            }
-          }
-        });
-        return clean;
-      };
-
-      // payloadData = stripAttachmentMetaFields(payloadData);
-
-      // Deep-clean helper to ensure full JSON-serializability (no File/Blob or file-metadata-like objects)
-      const deepCleanSerializable = (value) => {
-        const isPlainObject = (v) => Object.prototype.toString.call(v) === '[object Object]';
-        if (value == null) return value;
-        if (typeof File !== 'undefined' && value instanceof File) return undefined;
-        if (typeof Blob !== 'undefined' && value instanceof Blob) return undefined;
-        if (Array.isArray(value)) {
-          const cleaned = value
-            .map((item) => deepCleanSerializable(item))
-            .filter((item) => item !== undefined);
-          return cleaned;
-        }
-        if (isPlainObject(value)) {
-          const metaProps = ['name', 'size', 'type', 'lastModified', 'path', 'webkitRelativePath'];
-          const hasAnyMeta = metaProps.some((p) => Object.prototype.hasOwnProperty.call(value, p));
-          if (hasAnyMeta) {
-            return undefined;
-          }
-          const out = {};
-          Object.entries(value).forEach(([k, v]) => {
-            // Drop keys that look like file-ish
-            if (/file|attachment|anhang/i.test(k)) return;
-            const cleaned = deepCleanSerializable(v);
-            if (cleaned !== undefined) out[k] = cleaned;
-          });
-          return out;
-        }
-        if (typeof value === 'function') return undefined;
-        return value;
-      };
-
-      if (recordId) {
-        const originalRecord = records.find(r => r.id === recordId);
-        if (!originalRecord) {
-          throw new Error("Original record not found for update.");
-        }
-
-        const updatedRecordRaw = { ...originalRecord, ...payloadData };
-
-        if (updatedRecordRaw.status === 'geschlossen' && originalRecord?.status !== 'geschlossen') {
-          const clientForArchiving = mandanten.find(m => m.id === mandantId);
-          updatedRecordRaw.archivedMandantData = { ...clientForArchiving };
-          setFlashMessage('Akte wurde geschlossen und Mandantendaten archiviert.');
-        }
-        const updatedRecord = deepCleanSerializable(updatedRecordRaw);
-        const savedRecord = await api.updateRecord(recordId, updatedRecord);
-        if (fileToUpload && savedRecord?.id) {
-          try {
-            await api.uploadDocument(savedRecord.id, fileToUpload);
-          } catch (uploadErr) {
-            console.error('Fehler beim separaten Datei-Upload (Update):', uploadErr);
-          }
-        }
-        setFlashMessage('Akte erfolgreich aktualisiert!');
-      } else {
-        const newRecordRaw = {
-            ...payloadData,
-            aktenzeichen: nextCaseNumber,
-            dokumente: [],
-            notizen: [],
-            aufgaben: [],
-        };
-        const newRecord = deepCleanSerializable(newRecordRaw);
-        const createdRecord = await api.createRecord(newRecord);
-        if (fileToUpload && createdRecord?.id) {
-          try {
-            await api.uploadDocument(createdRecord.id, fileToUpload);
-          } catch (uploadErr) {
-            console.error('Fehler beim separaten Datei-Upload (Create):', uploadErr);
-          }
-        }
-        if (clientJustCreated) {
-          setFlashMessage('Neuer Mandant und Akte erfolgreich angelegt!');
-        } else {
-          setFlashMessage('Neue Akte erfolgreich angelegt!');
-        }
-      }
-
-      fetchData();
-    } catch (error) {
-      setFlashMessage(error.message);
-      console.error(error);
-      throw error; // Fehler an die aufrufende Komponente weiterleiten
     }
   };
 
@@ -549,7 +399,7 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
     try {
       await api.deleteRecord(recordId);
       setFlashMessage('Akte erfolgreich gelöscht!');
-      fetchData(); // Daten neu laden
+      fetchData();
     } catch (error) {
       setFlashMessage(`Fehler: ${error.message}`);
     }
@@ -578,7 +428,7 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
       const data = JSON.parse(text);
       await api.importData(data);
       setFlashMessage('Daten erfolgreich importiert. Die Ansicht wird aktualisiert.');
-      fetchData(); // Reload data
+      fetchData();
     } catch (error) {
       setFlashMessage(`Import-Fehler: ${error.message}`);
     }
@@ -586,7 +436,7 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
 
   return {
     isAppReady,
-    records: filteredRecords, // Pass filtered records to the UI
+    records: filteredRecords,
     todayDueRecords,
     mandanten,
     dritteBeteiligte,
@@ -614,7 +464,8 @@ export const useKanzleiLogic = (isLoggedIn, onLogout) => {
     handleExport,
     handleImport,
     nextCaseNumber,
-    setSearchTerm, // Expose setter for the search term
+    setSearchTerm,
+    allRecords: records, // Für die Validierung
   };
 };
 

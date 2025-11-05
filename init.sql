@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS gegner (
 -- Erstellung der Tabelle 'akten' mit Pfad-Referenz anstelle von JSONB-Feldern
 CREATE TABLE IF NOT EXISTS akten (
     id VARCHAR(255) PRIMARY KEY,
-    aktenzeichen VARCHAR(255) NOT NULL,
+    aktenzeichen VARCHAR(255) UNIQUE NOT NULL,
     status VARCHAR(50) NOT NULL,
     mandanten_id VARCHAR(255),
     dokumente_pfad TEXT
@@ -139,3 +139,11 @@ WHERE name IN (
     'mandanten:read', 'akten:read', 'gegner:read', 'documents:read'
 )
 ON CONFLICT DO NOTHING;
+-- Tabelle für allgemeine Einstellungen
+CREATE TABLE IF NOT EXISTS einstellungen (
+    key VARCHAR(255) PRIMARY KEY,
+    value TEXT
+);
+
+-- Standard-Startwert für Aktennummern, falls nicht vorhanden
+INSERT INTO einstellungen (key, value) VALUES ('aktennummer_start', '1') ON CONFLICT (key) DO NOTHING;

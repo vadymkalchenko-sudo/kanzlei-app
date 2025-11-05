@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import AdminAuthScreen from './AdminAuthScreen';
 import UserManagement from './UserManagement';
-
 const AdminPanel = ({ userRole, setFlashMessage, setCurrentView }) => {
     const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
 

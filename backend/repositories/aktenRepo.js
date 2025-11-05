@@ -35,6 +35,40 @@ const deleteFileIfExists = async (filePath) => {
     }
 };
 
+const generateNextAktenzeichen = async () => {
+    const client = await pool.connect();
+    try {
+        // 1. Höchste existierende Nummer und Startwert aus DB holen
+        const highestNumQuery = `
+            SELECT MAX(CAST(SPLIT_PART(aktenzeichen, '.', 1) AS INTEGER)) as max_num
+            FROM akten
+            WHERE aktenzeichen ~ '^[0-9]+\\.\\d{2}\\.awr$';
+        `;
+        const startValueQuery = "SELECT value FROM einstellungen WHERE key = 'aktennummer_start';";
+
+        const [highestNumResult, startValueResult] = await Promise.all([
+            client.query(highestNumQuery),
+            client.query(startValueQuery)
+        ]);
+
+        const maxNum = highestNumResult.rows[0]?.max_num || 0;
+        const startNum = parseInt(startValueResult.rows[0]?.value || '1', 10);
+
+        // 2. Die nächste Nummer bestimmen
+        // Prüfen, ob der Startwert bereits existiert
+        // Die nächste Nummer ist die höchste existierende Nummer ODER die konfigurierte Startnummer (minus 1, da wir +1 addieren), je nachdem, was größer ist.
+        // Das stellt sicher, dass wir immer vorwärts zählen und Lücken ignoriert werden, aber der Startwert respektiert wird.
+        const nextNum = Math.max(maxNum, startNum) + 1;
+        
+        // 3. Aktenzeichen formatieren
+        const year = new Date().getFullYear().toString().slice(-2);
+        return `${nextNum}.${year}.awr`;
+
+    } finally {
+        client.release();
+    }
+};
+
 const findAll = async () => {
     const aktenResult = await pool.query('SELECT * FROM akten');
     const notizenResult = await pool.query('SELECT * FROM notizen');
@@ -60,8 +94,10 @@ const findById = async (id) => {
 
 const create = async (body) => {
     try {
-        const { aktenzeichen, status = 'Offen', mandanten_id, dokumente_pfad } = body;
+        let { aktenzeichen, status = 'Offen', mandanten_id, dokumente_pfad } = body;
         const id = body.id || crypto.randomUUID();
+
+        
 
         const query = `
             INSERT INTO akten (id, aktenzeichen, status, mandanten_id, dokumente_pfad)
@@ -97,41 +133,26 @@ const update = async (id, body) => {
 };
 
 const remove = async (id) => {
-    // Zuerst die Akte aus der DB holen, um den Aktenzeichen-Namen zu erhalten
     const existingResult = await pool.query('SELECT * FROM akten WHERE id = $1', [id]);
     if (existingResult.rows.length === 0) {
         return 0;
     }
-    const existingAkte = existingResult.rows[0];
     
-    // Zuerst die Dokumente aus der DB löschen (falls vorhanden)
-    // Das Löschen der physischen Dateien wird später durch die dokumente-Repo erfolgen
-    
-    // DB Eintrag löschen
     const result = await pool.query('DELETE FROM akten WHERE id = $1', [id]);
     return result.rowCount;
 };
 
-// Neue Funktionen für Dokumentenverwaltung
 const addDocument = async (akteId, fileName, filePath, mimeType, fileSize) => {
     try {
-        // Aktenzeichen aus der DB holen
         const akteResult = await pool.query('SELECT aktenzeichen FROM akten WHERE id = $1', [akteId]);
         if (akteResult.rows.length === 0) {
             throw new Error('Akte nicht gefunden');
         }
         const aktenzeichen = akteResult.rows[0].aktenzeichen;
         
-        // Zielverzeichnis erstellen
         const targetDir = path.join('/app/documents', aktenzeichen);
         await ensureDirectoryExists(targetDir);
         
-        // Datei in das Zielverzeichnis verschieben
-        const targetPath = path.join(targetDir, fileName);
-        // Beachte: Bei der Implementierung in der echten Umgebung würde hier die Datei tatsächlich verschoben werden
-        // Hier simulieren wir das mit einer einfachen Zuweisung
-        
-        // In der DB eintragen
         const docId = crypto.randomUUID();
         const insertQuery = `
             INSERT INTO dokumente (id, akte_id, dateiname, pfad, hochgeladen_am)
@@ -172,18 +193,15 @@ const getDocumentById = async (docId) => {
 
 const removeDocument = async (docId) => {
     try {
-        // Zuerst die Dokumentendetails aus der DB holen
         const docResult = await pool.query('SELECT * FROM dokumente WHERE id = $1', [docId]);
         if (docResult.rows.length === 0) {
             return 0;
         }
         const document = docResult.rows[0];
         
-        // Physische Datei löschen
         const fullPath = path.join('/app/documents', document.pfad);
         await deleteFileIfExists(fullPath);
         
-        // DB Eintrag löschen
         const deleteResult = await pool.query('DELETE FROM dokumente WHERE id = $1', [docId]);
         return deleteResult.rowCount;
     } catch (error) {
@@ -202,6 +220,7 @@ module.exports = {
     getDocumentsForAkte,
     getDocumentById,
     removeDocument,
+    generateNextAktenzeichen,
     addNote: async (akteId, noteData) => {
         const { titel, inhalt, typ, betrag_soll, betrag_haben, autor, datum } = noteData;
         const id = crypto.randomUUID();

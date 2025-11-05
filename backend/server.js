@@ -247,6 +247,7 @@ app.use('/api/records', authenticateToken, authorize(['akten:read']), createRout
 app.use('/api/mandanten', authenticateToken, authorize(['mandanten:read']), createRouter(mandantenRepo));
 app.use('/api/dritte-beteiligte', authenticateToken, authorize(['gegner:read']), createRouter(gegnerRepo));
 
+
 // --- Spezifische Routen für Notizen ---
 app.post('/api/records/:recordId/notes', authenticateToken, authorize(['notes:create']), async (req, res) => {
     try {
@@ -561,6 +562,7 @@ app.get('/api/permissions', authenticateToken, authorize(['roles:manage']), asyn
         res.status(500).json({ error: 'Interner Serverfehler' });
     }
 });
+
 
 // Server starten
 const startServer = async () => {

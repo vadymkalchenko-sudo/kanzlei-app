@@ -64,6 +64,7 @@ export const App = () => {
         handleImport,
         nextCaseNumber,
         setSearchTerm,
+        allRecords,
     } = useKanzleiLogic(isLoggedIn, handleLogout);
 
     const [currentView, setCurrentView] = useState('akten');
@@ -79,8 +80,6 @@ export const App = () => {
     const dropdownRef = useRef(null);
     const [showDueTodayOnly, setShowDueTodayOnly] = useState(false);
 
-    // Auth state
-
     const handleLogin = async (e) => {
         e.preventDefault();
         const result = await login(username, password);
@@ -92,8 +91,6 @@ export const App = () => {
             setFlashMessage({ type: 'error', message: result.message });
         }
     };
-
-
 
     const navigateToStammdaten = (tab = 'mandanten') => {
         setInitialStammdatenTab(tab);
@@ -439,6 +436,7 @@ export const App = () => {
                             onRecordSubmit={handleRecordSubmit}
                             onCancel={handleCloseModal}
                             nextCaseNumber={nextCaseNumber}
+                            allRecords={allRecords}
                             onNavigateToStammdaten={navigateToStammdaten}
                             handleDritteSubmit={handleDritteSubmit}
                             handleMandantSubmit={handleMandantSubmit}
