@@ -108,6 +108,12 @@ export const updateRecord = (id, data, signal) => {
 };
 export const deleteRecord = (id, signal) => apiRequest(`${API_BASE_URL}/records/${id}`, { method: 'DELETE', signal });
 
+// Aggregation API
+export const aggregateRecord = (id) => apiRequest(`${API_BASE_URL}/records/${id}/aggregate`, {
+  method: 'PUT',
+  headers: { 'Content-Type': 'application/json' },
+});
+
 // Notizen API
 export const addNote = (recordId, noteData) => apiRequest(`${API_BASE_URL}/records/${recordId}/notes`, {
   method: 'POST',

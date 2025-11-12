@@ -58,44 +58,62 @@ const AufgabenPanel = ({
         return { active, history };
     }, [aufgaben]);
 
-    const AufgabeItem = ({ aufgabe, isHistory = false }) => (
-        <div className={`p-3 mb-2 rounded-md flex items-center justify-between ${isHistory ? 'bg-green-100' : 'bg-red-50'}`}>
-            <div className="flex-grow">
-                <div className="flex items-start">
-                    {!isHistory && canEdit && (
-                        <input
-                            type="checkbox"
-                            checked={!!aufgabe.erledigt}
-                            onChange={(e) => {
-                                e.stopPropagation();
-                                onToggleAufgabeErledigt(recordId, aufgabe.id);
-                            }}
-                            className="h-5 w-5 mr-4 mt-1 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                    )}
-                    <div className="flex-grow">
-                        <p className="font-semibold text-gray-800">{aufgabe.titel || aufgabe.beschreibung}</p>
-                        <p className="text-sm text-gray-600">Fällig am: {formatDate(aufgabe.faelligkeitsdatum)}</p>
-                        {aufgabe.inhalt && <p className="text-sm text-gray-500 mt-1 whitespace-pre-wrap">{aufgabe.inhalt}</p>}
+    const AufgabeItem = ({ aufgabe, isHistory = false }) => {
+        // Überprüfe, ob die Aufgabe überfällig ist
+        const isUeberfaellig = !isHistory && !aufgabe.erledigt && aufgabe.faelligkeitsdatum && new Date(aufgabe.faelligkeitsdatum) < new Date();
+        
+        // Wähle die Hintergrundfarbe basierend auf dem Status
+        let bgColor = 'bg-gray-50'; // Standardfarbe für erledigte Aufgaben
+        if (!isHistory && !aufgabe.erledigt) {
+            bgColor = isUeberfaellig ? 'bg-red-100 border-l-4 border-red-500' : 'bg-yellow-50 border-l-4 border-yellow-500';
+        } else if (isHistory) {
+            bgColor = 'bg-green-100';
+        }
+        
+        return (
+            <div className={`p-3 mb-2 rounded-md flex items-center justify-between ${bgColor}`}>
+                <div className="flex-grow">
+                    <div className="flex items-start">
+                        {!isHistory && canEdit && (
+                            <input
+                                type="checkbox"
+                                checked={!!aufgabe.erledigt}
+                                onChange={(e) => {
+                                    e.stopPropagation();
+                                    onToggleAufgabeErledigt(recordId, aufgabe.id);
+                                }}
+                                className="h-5 w-5 mr-4 mt-1 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                        )}
+                        <div className="flex-grow">
+                            <p className={`font-semibold ${isUeberfaellig ? 'text-red-700' : 'text-gray-800'}`}>
+                                {aufgabe.titel || aufgabe.beschreibung}
+                            </p>
+                            <p className={`text-sm ${isUeberfaellig ? 'text-red-600' : 'text-gray-600'}`}>
+                                Fällig am: {aufgabe.faelligkeitsdatum ? formatDate(aufgabe.faelligkeitsdatum) : 'Nicht gesetzt'}
+                                {isUeberfaellig && ' (Überfällig)'}
+                            </p>
+                            {aufgabe.inhalt && <p className="text-sm text-gray-500 mt-1 whitespace-pre-wrap">{aufgabe.inhalt}</p>}
+                        </div>
                     </div>
                 </div>
+                {(canEdit || canDelete) && (
+                    <div className="flex items-center ml-4">
+                        {canEdit && (
+                            <button onClick={() => handleOpenAufgabeModal(aufgabe)} className="p-1 text-blue-600 hover:text-blue-800" title="Bearbeiten">
+                                <svg xmlns="http://www.w3.org/200/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
+                            </button>
+                        )}
+                        {canDelete && (
+                            <button onClick={() => onDeleteAufgabe(recordId, aufgabe.id)} className="p-1 text-red-600 hover:text-red-800 ml-2" title="Löschen">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 016.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
-            {(canEdit || canDelete) && (
-                <div className="flex items-center ml-4">
-                    {canEdit && (
-                        <button onClick={() => handleOpenAufgabeModal(aufgabe)} className="p-1 text-blue-600 hover:text-blue-800" title="Bearbeiten">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
-                        </button>
-                    )}
-                    {canDelete && (
-                        <button onClick={() => onDeleteAufgabe(recordId, aufgabe.id)} className="p-1 text-red-600 hover:text-red-800 ml-2" title="Löschen">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
-                    )}
-                </div>
-            )}
-        </div>
-    );
+        );
+    };
 
 
     return (

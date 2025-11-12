@@ -1,5 +1,5 @@
 # --- Stage 1: Builder (Kompilierung) ---
-FROM node:18-bullseye-slim AS builder
+FROM node:18-slim AS builder
 WORKDIR /app/backend
 
 # Kopiere package files und lock file
@@ -16,7 +16,7 @@ WORKDIR /app/backend
 # Kopiere nur die kompilierten Node-Module vom Builder-Stage
 COPY --from=builder /app/backend/node_modules ./node_modules
 # Kopiere den gesamten Code
-COPY . .
+COPY . /app/backend
 
 # Setze den korrekten Startpunkt
 CMD ["node", "server.js"]

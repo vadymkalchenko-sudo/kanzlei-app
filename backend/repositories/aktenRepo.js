@@ -222,27 +222,67 @@ module.exports = {
     removeDocument,
     generateNextAktenzeichen,
     addNote: async (akteId, noteData) => {
-        const { titel, inhalt, typ, betrag_soll, betrag_haben, autor, datum } = noteData;
+        const { titel, inhalt, typ, betrag_soll, betrag_haben, autor } = noteData;
         const id = crypto.randomUUID();
-        const query = `
-            INSERT INTO notizen (id, akte_id, titel, inhalt, typ, betrag_soll, betrag_haben, autor, erstellungsdatum)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, ${datum ? '$9' : 'CURRENT_TIMESTAMP'})
-            RETURNING *
-        `;
-        const values = [id, akteId, titel, inhalt, typ, betrag_soll || 0, betrag_haben || 0, autor || 'System'];
-        if (datum) values.push(datum);
+        // Set faelligkeitsdatum only if type is 'Aufgabe'
+        const faelligkeitsdatum = typ === 'Aufgabe' ? noteData.faelligkeitsdatum : null;
+
+        let query = `
+            INSERT INTO notizen (id, akte_id, titel, inhalt, typ, betrag_soll, betrag_haben, autor, erstellungsdatum, faelligkeitsdatum)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, `;
+        let values = [id, akteId, titel, inhalt, typ, betrag_soll || 0, betrag_haben || 0, autor || 'System'];
+        let paramIndex = values.length + 1;
+
+        if (noteData.datum) {
+            query += `${paramIndex++}, `;
+            values.push(noteData.datum);
+        } else {
+            query += `CURRENT_TIMESTAMP, `;
+        }
+
+        if (faelligkeitsdatum) {
+            query += `${paramIndex++}) `;
+            values.push(faelligkeitsdatum);
+        } else {
+            query += `NULL) `;
+        }
+        query += `RETURNING *`;
+
         const result = await pool.query(query, values);
         return result.rows[0];
     },
     updateNote: async (noteId, noteData) => {
         const { titel, inhalt, typ, betrag_soll, betrag_haben, erledigt, datum } = noteData;
-        const query = `
+        // Set faelligkeitsdatum only if type is 'Aufgabe'
+        const faelligkeitsdatum = typ === 'Aufgabe' ? noteData.faelligkeitsdatum : null;
+
+        console.log('DEBUG: updateNote - faelligkeitsdatum:', faelligkeitsdatum, 'Type:', typeof faelligkeitsdatum);
+
+        let query = `
             UPDATE notizen
-            SET titel = $1, inhalt = $2, typ = $3, betrag_soll = $4, betrag_haben = $5, erledigt = $6, aktualisierungsdatum = CURRENT_TIMESTAMP, erstellungsdatum = COALESCE($8, erstellungsdatum)
-            WHERE id = $7
-            RETURNING *
-        `;
-        const values = [titel, inhalt, typ, betrag_soll, betrag_haben, erledigt, noteId, datum];
+            SET titel = $1, inhalt = $2, typ = $3, betrag_soll = $4, betrag_haben = $5, erledigt = $6, aktualisierungsdatum = CURRENT_TIMESTAMP, `;
+        let values = [titel, inhalt, typ, betrag_soll, betrag_haben, erledigt, noteId];
+        let paramIndex = values.length + 1;
+
+        // erstellungsdatum
+        if (datum) {
+            query += `erstellungsdatum = ${paramIndex++}, `;
+            values.push(datum);
+        } else {
+            query += `erstellungsdatum = erstellungsdatum, `; // Behalte das bestehende Datum bei
+        }
+
+        // faelligkeitsdatum
+        if (faelligkeitsdatum) {
+            query += `faelligkeitsdatum = ${paramIndex++} `;
+            values.push(faelligkeitsdatum);
+        } else {
+            query += `faelligkeitsdatum = NULL `; // Setze auf NULL, wenn kein Fälligkeitsdatum
+        }
+
+        query += `WHERE id = ${paramIndex++} RETURNING *`;
+        values.push(noteId); // noteId muss als letzter Parameter für WHERE-Klausel hinzugefügt werden
+
         const result = await pool.query(query, values);
         return result.rows[0];
     },

@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS notizen (
     autor VARCHAR(255),
     erstellungsdatum TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     aktualisierungsdatum TIMESTAMP,
-    erledigt BOOLEAN DEFAULT FALSE
+    erledigt BOOLEAN DEFAULT FALSE,
+    faelligkeitsdatum DATE
 );
 
 -- Erstellung der Tabelle 'roles'

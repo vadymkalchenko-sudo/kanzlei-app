@@ -9,7 +9,7 @@ import PersonForm from './components/PersonForm.jsx';
 import AdminPanel from './components/AdminPanel/AdminPanel.jsx';
 import { login, logout, getToken, getUserRole } from './services/authService.js';
 
-// Hauptkomponente, die die gesamte Anwendung darstellt
+// Hauptkomponente, die gesamte Anwendung darstellt
 export const App = () => {
     const [isLoggedIn, setIsLoggedIn] = useState(!!getToken());
     const [userRole, setUserRole] = useState(null);
@@ -65,8 +65,9 @@ export const App = () => {
         nextCaseNumber,
         setSearchTerm,
         allRecords,
+        closeAkte,
     } = useKanzleiLogic(isLoggedIn, handleLogout);
-
+  
     const [currentView, setCurrentView] = useState('akten');
     const [initialStammdatenTab, setInitialStammdatenTab] = useState('mandanten');
     const [itemToEdit, setItemToEdit] = useState(null);
@@ -79,6 +80,7 @@ export const App = () => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
     const [showDueTodayOnly, setShowDueTodayOnly] = useState(false);
+    const [filterMode, setFilterMode] = useState('all'); // 'all' oder 'zahlungen'
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -280,7 +282,7 @@ export const App = () => {
                                             handleLogout();
                                             setIsDropdownOpen(false);
                                         }}
-                                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-10"
                                     >
                                         Logout
                                     </button>
@@ -307,7 +309,7 @@ export const App = () => {
                     {currentView === 'akten' && (
                         <>
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-2xl font-semibold text-gray-700">Aktenübersicht</h2>
+                                <h2 className="text-2xl font-semibold text-gray-70">Aktenübersicht</h2>
                                 {userRole !== 'extern' && (
                                     <div className="flex items-center">
                                         <button onClick={() => navigateToStammdaten('mandanten')} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 mr-4">
@@ -333,7 +335,7 @@ export const App = () => {
                                         <div className={`block w-12 h-6 rounded-full transition-colors ${showDueTodayOnly ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
                                         <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 ${showDueTodayOnly ? 'transform translate-x-6' : ''}`}></div>
                                     </div>
-                                    <div className="ml-3 text-gray-700 font-medium">
+                                    <div className="ml-3 text-gray-70 font-medium">
                                         Heute fällige Fristen
                                     </div>
                                 </label>
@@ -351,6 +353,21 @@ export const App = () => {
                                 </div>
                             )}
 
+                            {/* Filter-Buttons */}
+                            {!showDueTodayOnly && filterMode !== 'zahlungen' && (
+                                <div className="mb-6">
+                                    <button
+                                        onClick={() => setFilterMode(filterMode === 'zahlungen' ? 'all' : 'zahlungen')}
+                                        className={`px-4 py-2 rounded-lg shadow-md transition-transform transform hover:scale-105 ${
+                                            filterMode === 'zahlungen' 
+                                                ? 'bg-green-600 hover:bg-green-700 text-white' 
+                                                : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                                        }`}
+                                    >
+                                        {filterMode === 'zahlungen' ? 'Zahlungseingänge ausblenden' : 'Zahlungseingänge anzeigen'}
+                                    </button>
+                                </div>
+                            )}
                             {isAppReady ? (
                                 showDueTodayOnly ? (
                                     todayDueRecords.length > 0 ? (
@@ -365,14 +382,17 @@ export const App = () => {
                                     )
                                 ) : (
                                     <AktenList
-                                        records={records}
+                                        records={filterMode === 'zahlungen' 
+                                            ? records.filter(record => record.metadata?.hat_zahlungseingang === true) 
+                                            : records}
                                         mandanten={mandanten}
                                         onEdit={handleOpenAkteModal}
                                         userRole={userRole}
+                                        filterMode={filterMode}
                                     />
                                 )
                             ) : (
-                                <p className="text-center text-gray-500 py-12">Lade Akten...</p>
+                                <p className="text-center text-gray-50 py-12">Lade Akten...</p>
                             )}
                         </>
                     )}
@@ -413,6 +433,7 @@ export const App = () => {
                             onUpdateAufgabe={handleUpdateAufgabe}
                             onDeleteAufgabe={handleDeleteAufgabe}
                             onToggleAufgabeErledigt={handleToggleAufgabeErledigt}
+                            onCloseAkte={closeAkte}
                             userRole={userRole}
                         />
                     )}

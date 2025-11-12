@@ -41,7 +41,7 @@ const initializeDatabase = async () => {
         console.log('Datenbankverbindung erfolgreich.');
 
         // Lese das korrekte Schema aus der init.sql-Datei
-        const initSqlPath = path.join(__dirname, './init.sql');
+        const initSqlPath = path.join(__dirname, '../init.sql');
         const initSql = fs.readFileSync(initSqlPath, 'utf-8');
         
         // Tabellen zwangsweise löschen für einen sauberen Start
@@ -279,6 +279,62 @@ app.delete('/api/records/:recordId/notes/:noteId', authenticateToken, authorize(
     }
 });
 
+// Aggregations-Endpunkt für Akten
+app.put('/api/records/:recordId/aggregate', authenticateToken, authorize(['akten:update']), async (req, res) => {
+    try {
+        const { recordId } = req.params;
+        
+        // Akte mit Dokumenten und Notizen abrufen
+        const akte = await aktenRepo.findById(recordId);
+        if (!akte) {
+            return res.status(404).json({ error: 'Akte nicht gefunden' });
+        }
+
+        // Soll- und Haben-Beträge aggregieren
+        let gesamt_forderung_soll = 0;
+        let gesamt_zahlung_haben = 0;
+
+        // Dokumente durchgehen
+        if (akte.dokumente) {
+            for (const doc of akte.dokumente) {
+                const soll = parseFloat(doc.betrag_soll) || 0;
+                const haben = parseFloat(doc.betrag_haben) || 0;
+                gesamt_forderung_soll += soll;
+                gesamt_zahlung_haben += haben;
+            }
+        }
+
+        // Notizen durchgehen
+        if (akte.notizen) {
+            for (const note of akte.notizen) {
+                const soll = parseFloat(note.betrag_soll) || 0;
+                const haben = parseFloat(note.betrag_haben) || 0;
+                gesamt_forderung_soll += soll;
+                gesamt_zahlung_haben += haben;
+            }
+        }
+
+        // Prüfen, ob Zahlungseingang vorhanden ist (Haben > 0)
+        const hat_zahlungseingang = gesamt_zahlung_haben > 0;
+
+        // Aggregierte Werte in der Akte aktualisieren
+        const updatedAkte = await aktenRepo.update(recordId, {
+            ...akte,
+            metadata: {
+                ...akte.metadata,
+                gesamt_forderung_soll,
+                gesamt_zahlung_haben,
+                hat_zahlungseingang
+            }
+        });
+
+        res.json(updatedAkte);
+    } catch (error) {
+        console.error('Fehler bei der Aggregation:', error);
+        res.status(500).json({ error: 'Interner Serverfehler bei der Aggregation' });
+    }
+});
+
 
 // Datei-Upload-Route
 app.post('/api/records/:recordId/documents', authenticateToken, authorize(['documents:upload']), upload.array('documents'), async (req, res) => {
@@ -425,6 +481,7 @@ app.post('/api/login', async (req, res) => {
 
         const passwordMatch = await bcrypt.compare(password, user.password_hash);
         if (!passwordMatch) {
+            console.log('Login-Fehler: Passwort stimmt nicht überein für Benutzer:', username);
             return res.status(401).json({ error: 'Ungültige Anmeldeinformationen' });
         }
 

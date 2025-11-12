@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import * as api from '../api';
+import { AkteService } from '../services/akteService';
 import { Button } from './ui/Button.jsx';
 import { Modal } from './ui/Modal.jsx';
 import DocumentForm from './DocumentForm.jsx';
@@ -26,10 +27,12 @@ export const Aktenansicht = ({
   onUpdateAufgabe,
   onDeleteAufgabe,
   onToggleAufgabeErledigt,
+  onCloseAkte,
   userRole,
 }) => {
   const fileInputRef = useRef(null);
   const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
+  const [isConfirmCloseModalOpen, setIsConfirmCloseModalOpen] = useState(false);
   const [isEditDocModalOpen, setIsEditDocModalOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
@@ -71,6 +74,17 @@ export const Aktenansicht = ({
 
     const updateFn = isDocument ? onUpdateDocument : onUpdateNote;
     updateFn(record.id, id, updateData);
+
+    // Aggregation nach dem Update auslösen und Akte neu laden
+    setTimeout(async () => {
+      try {
+        const updatedRecord = await api.aggregateRecord(record.id);
+        // Aktualisiere den Record-State in der übergeordneten Komponente
+        onUpdateRecord(record.id, updatedRecord);
+      } catch (error) {
+        console.error('Fehler bei der Aggregation:', error);
+      }
+    }, 100); // Kurze Verzögerung, um sicherzustellen, dass das Update durchgeführt wurde
 
     setEditingCell(null);
     setEditValue('');
@@ -116,8 +130,18 @@ export const Aktenansicht = ({
     setSelectedDoc(null);
   };
 
-  const handleUpdateDocSubmit = (updatedData) => {
-    onUpdateDocument(record.id, selectedDoc.id, updatedData);
+  const handleUpdateDocSubmit = async (updatedData) => {
+    await onUpdateDocument(record.id, selectedDoc.id, updatedData);
+    
+    // Aggregation nach dem Update auslösen und Akte neu laden
+    try {
+      const updatedRecord = await api.aggregateRecord(record.id);
+      // Aktualisiere den Record-State in der übergeordneten Komponente
+      onUpdateRecord(record.id, updatedRecord);
+    } catch (error) {
+      console.error('Fehler bei der Aggregation:', error);
+    }
+    
     handleCloseEditModal();
   };
 
@@ -131,12 +155,22 @@ export const Aktenansicht = ({
     setSelectedNote(null);
   };
 
-  const handleNoteSubmit = (noteData) => {
+  const handleNoteSubmit = async (noteData) => {
     if (selectedNote) {
-      onUpdateNote(record.id, selectedNote.id, noteData);
+      await onUpdateNote(record.id, selectedNote.id, noteData);
     } else {
-      onAddNote(record.id, noteData);
+      await onAddNote(record.id, noteData);
     }
+    
+    // Aggregation nach dem Update auslösen und Akte neu laden
+    try {
+      const updatedRecord = await api.aggregateRecord(record.id);
+      // Aktualisiere den Record-State in der übergeordneten Komponente
+      onUpdateRecord(record.id, updatedRecord);
+    } catch (error) {
+      console.error('Fehler bei der Aggregation:', error);
+    }
+    
     handleCloseNoteModal();
   };
 
@@ -149,12 +183,46 @@ export const Aktenansicht = ({
     onGoBack();
   };
 
+  const handleCloseAkte = () => {
+    setIsConfirmCloseModalOpen(true);
+  };
+
+  const confirmCloseAkte = () => {
+    onCloseAkte(record.id);
+    setIsConfirmCloseModalOpen(false);
+  };
+
 
   const combinedItems = useMemo(() => {
     const documents = (record?.dokumente || []).filter(Boolean).map(doc => ({ ...doc, itemType: 'document', date: doc.hochgeladen_am, name: doc.dateiname }));
     const notes = (record?.notizen || []).filter(note => note && note.typ !== 'Aufgabe').map(note => ({ ...note, itemType: 'note', date: note.aktualisierungsdatum || note.erstellungsdatum }));
 
-    const allItems = [...documents, ...notes];
+    // Identifiziere Archiv-Snapshots und passe deren Eigenschaften an
+    const processedNotes = notes.map(note => {
+      // Überprüfe, ob es sich um einen Archiv-Snapshot handelt
+      if (note.typ === 'Archiv' && note.titel === 'Akte-Archiv') {
+        try {
+          // Versuche, den Inhalt als JSON zu parsen, um das Archivdatum zu extrahieren
+          const archiveData = JSON.parse(note.inhalt);
+          if (archiveData.archiviertAm) {
+            return {
+              ...note,
+              itemType: 'archive',
+              date: archiveData.archiviertAm,
+              format: 'Archiv-Snapshot',
+              beschreibung: 'Archivkopie der Akte zum Schließungsdatum',
+              isArchiveSnapshot: true
+            };
+          }
+        } catch (e) {
+          // Wenn das Parsen fehlschlägt, handle als normale Notiz
+          console.warn('Could not parse archive note content as JSON:', e);
+        }
+      }
+      return note;
+    });
+
+    const allItems = [...documents, ...processedNotes];
 
     return allItems.sort((a, b) => {
       const dateA = new Date(a.date);
@@ -167,12 +235,8 @@ export const Aktenansicht = ({
   }, [record?.dokumente, record?.notizen, sortOrder]);
 
   const netBalance = useMemo(() => {
-    return (combinedItems || []).reduce((acc, item) => {
-        const haben = parseFloat(item.betrag_haben) || 0;
-        const soll = parseFloat(item.betrag_soll) || 0;
-        return acc + haben - soll;
-    }, 0);
-  }, [combinedItems]);
+    return AkteService.calculateNetBalance(record);
+  }, [record]);
 
   const handleOpenDocument = async (documentId) => {
     try {
@@ -274,6 +338,11 @@ export const Aktenansicht = ({
         </div>
         <div className="ml-4 flex items-center space-x-2">
           <Button onClick={onGoBack}>Zurück zur Übersicht</Button>
+          {canEdit && record.status !== 'geschlossen' && record.status !== 'archiviert' && (
+            <Button onClick={handleCloseAkte} className="bg-red-500 hover:bg-red-600 text-white">
+              Akte schließen
+            </Button>
+          )}
           {canDelete && (
             <Button onClick={handleDeleteAkte} className="bg-red-600 hover:bg-red-700 text-white">
               Akte löschen
@@ -363,15 +432,32 @@ export const Aktenansicht = ({
                     combinedItems.map((item) => (
                       <tr
                         key={item.id}
-                        onDoubleClick={() => item.itemType === 'document' ? handleOpenDocument(item.id) : (canEdit && handleOpenNoteModal(item))}
-                        className={`hover:bg-gray-50 ${canEdit ? 'cursor-pointer' : ''}`}
+                        onDoubleClick={() => {
+                          if (item.itemType === 'document') {
+                            handleOpenDocument(item.id);
+                          } else if (canEdit && !item.isArchiveSnapshot) {
+                            handleOpenNoteModal(item);
+                          }
+                        }}
+                        className={`hover:bg-gray-50 ${canEdit && !item.isArchiveSnapshot ? 'cursor-pointer' : ''}`}
                       >
-                        <td className="px-4 py-2 border-b text-center">{item.itemType === 'document' ? '📄' : '📝'}</td>
+                        <td className="px-4 py-2 border-b text-center">
+                          {item.itemType === 'document' ? '📄' :
+                           item.itemType === 'archive' ? '📦' : '📝'}
+                        </td>
                         <td className="px-4 py-2 border-b">{formatDate(item.date)}</td>
-                        <td className="px-4 py-2 border-b">{item.itemType === 'document' ? item.dateiname : (item.titel || item.inhalt)}</td>
-                        <td className="px-4 py-2 border-b">{item.itemType === 'document' ? simplifyFormat(item) : item.typ || 'Notiz'}</td>
-                        <td className="px-4 py-2 border-b text-right" onClick={() => canEdit && handleCellClick(item, 'soll')}>
-                            {editingCell?.id === item.id && editingCell?.field === 'soll' ? (
+                        <td className="px-4 py-2 border-b">
+                          {item.itemType === 'document' ? item.dateiname :
+                           item.itemType === 'archive' ? item.beschreibung || (item.titel || item.inhalt) :
+                           (item.titel || item.inhalt)}
+                        </td>
+                        <td className="px-4 py-2 border-b">
+                          {item.itemType === 'document' ? simplifyFormat(item) :
+                           item.itemType === 'archive' ? item.format || 'Archiv-Snapshot' :
+                           item.typ || 'Notiz'}
+                        </td>
+                        <td className="px-4 py-2 border-b text-right" onClick={() => canEdit && !item.isArchiveSnapshot && handleCellClick(item, 'soll')}>
+                            {editingCell?.id === item.id && editingCell?.field === 'soll' && !item.isArchiveSnapshot ? (
                                 <input
                                     type="text"
                                     value={editValue}
@@ -386,8 +472,8 @@ export const Aktenansicht = ({
                                 `${(parseFloat(item.betrag_soll) || 0).toFixed(2).replace('.', ',')} €`
                             )}
                         </td>
-                        <td className="px-4 py-2 border-b text-right" onClick={() => canEdit && handleCellClick(item, 'haben')}>
-                            {editingCell?.id === item.id && editingCell?.field === 'haben' ? (
+                        <td className="px-4 py-2 border-b text-right" onClick={() => canEdit && !item.isArchiveSnapshot && handleCellClick(item, 'haben')}>
+                            {editingCell?.id === item.id && editingCell?.field === 'haben' && !item.isArchiveSnapshot ? (
                                 <input
                                     type="text"
                                     value={editValue}
@@ -472,6 +558,14 @@ export const Aktenansicht = ({
         onConfirm={confirmDeleteAkte}
         title="Akte löschen"
         message="Sind Sie sicher, dass Sie diese Akte endgültig löschen möchten?"
+      />
+
+      <ConfirmModal
+        isOpen={isConfirmCloseModalOpen}
+        onClose={() => setIsConfirmCloseModalOpen(false)}
+        onConfirm={confirmCloseAkte}
+        title="Akte schließen"
+        message="Möchten Sie diese Akte wirklich schließen und archivieren? Dieser Vorgang kann nicht rückgängig gemacht werden."
       />
     </div>
   );

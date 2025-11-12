@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS akten (
     mandanten_id UUID NOT NULL REFERENCES mandanten(id) ON DELETE CASCADE,
     file_number VARCHAR(50) UNIQUE NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'Offen',
-    metadata JSONB NOT NULL DEFAULT '{}'
+    metadata JSONB NOT NULL DEFAULT '{"gesamt_forderung_soll": 0, "gesamt_zahlung_haben": 0, "hat_zahlungseingang": false}'
 );
 
 -- 3. GEGNER-Tabelle (Hybrid: JSONB und NOT NULL)

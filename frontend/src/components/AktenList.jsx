@@ -24,7 +24,7 @@ const getDeadlineStatus = (record) => {
   }
 
   const sevenDaysFromNow = new Date(today);
-  sevenDaysFromNow.setDate(today.getDate() + 7);
+ sevenDaysFromNow.setDate(today.getDate() + 7);
 
   if (closestDeadline <= today) {
     return 'urgent'; // Red
@@ -42,27 +42,55 @@ const getDeadlineStatus = (record) => {
  * @param {object[]} mandanten - Die Liste der Mandanten zum Verknüpfen der Namen.
  * @param {function} onEdit - Die Callback-Funktion zum Bearbeiten einer Akte.
  * @param {function} onDelete - Die Callback-Funktion zum Löschen einer Akte.
+ * @param {string} filterMode - Der aktuelle Filtermodus ('all', 'zahlungen')
  */
-export const AktenList = ({ records, mandanten, onEdit }) => {
+export const AktenList = ({ records, mandanten, onEdit, filterMode = 'all' }) => {
   // onDelete prop is removed as per requirements
-  return (
+ return (
     <div className="overflow-x-auto bg-white rounded-lg shadow-md">
       <table className="min-w-full table-auto">
         <thead className="bg-gray-50 border-b border-gray-200">
           <tr>
             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Aktenzeichen</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Mandant</th>
+            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-50 uppercase tracking-wider">Mandant</th>
             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Gegner</th>
+            {filterMode === 'zahlungen' && (
+              <>
+                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-50 uppercase tracking-wider">Soll</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-50 uppercase tracking-wider">Haben</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-50 uppercase tracking-wider">Differenz</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-50 uppercase tracking-wider">Prüf-Status</th>
+              </>
+            )}
+            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-50 uppercase tracking-wider">Gegner</th>
             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Schaden-Datum</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Kennzeichen</th>
-            <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Aktionen</th>
+            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-50 uppercase tracking-wider">Kennzeichen</th>
+            <th className="px-6 py-3 text-right text-xs font-semibold text-gray-50 uppercase tracking-wider">Aktionen</th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {records.map((record) => {
             const mandant = mandanten.find(m => m.id === record.mandanten_id);
             const deadlineStatus = getDeadlineStatus(record);
+            
+            // Berechne Zahlungsdaten falls Filtermodus aktiv ist
+            let gesamt_forderung_soll = 0;
+            let gesamt_zahlung_haben = 0;
+            let differenz = 0;
+            let pruefStatus = '';
+            
+            if (filterMode === 'zahlungen' && record.metadata) {
+              gesamt_forderung_soll = parseFloat(record.metadata.gesamt_forderung_soll) || 0;
+              gesamt_zahlung_haben = parseFloat(record.metadata.gesamt_zahlung_haben) || 0;
+              differenz = gesamt_forderung_soll - gesamt_zahlung_haben;
+              
+              if (record.metadata.hat_zahlungseingang) {
+                pruefStatus = Math.abs(differenz) < 0.01 ? 'Gedeckt' : 'Differenz';
+              } else {
+                pruefStatus = 'Keine Zahlungen';
+              }
+            }
+            
             return (
               <tr key={record.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">
@@ -79,6 +107,24 @@ export const AktenList = ({ records, mandanten, onEdit }) => {
                     {record.status}
                   </span>
                 </td>
+                {filterMode === 'zahlungen' && (
+                  <>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-600">{gesamt_forderung_soll.toFixed(2).replace('.', ',')} €</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-600">{gesamt_zahlung_haben.toFixed(2).replace('.', ',')} €</td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-medium ${differenz < 0 ? 'text-green-600' : differenz > 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                      {Math.abs(differenz).toFixed(2).replace('.', ',')} €
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        pruefStatus === 'Gedeckt' ? 'bg-green-100 text-green-800' : 
+                        pruefStatus === 'Differenz' ? 'bg-red-100 text-red-800' : 
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {pruefStatus}
+                      </span>
+                    </td>
+                  </>
+                )}
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{record.gegner_name || 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{record.unfall_datum ? new Date(record.unfall_datum).toLocaleDateString() : 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{record.mandanten_kennzeichen || 'N/A'}</td>
